@@ -4,8 +4,8 @@ from sys import modules
 
 _backends = []
 for module_finder, module_name, is_pkg in pkgutil.iter_modules(
-        __path__,
-        prefix=__name__ + ".",
+    __path__,
+    prefix=__name__ + ".",
 ):
     # skip .py files (like libdevice.py)
     if not is_pkg:

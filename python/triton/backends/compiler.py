@@ -52,8 +52,15 @@ class AttrsDescriptor:
     `constant_properties`: a set containing the properties that can be used to determine if a parameter is constant
 
     """
-    __slots__ = ('divisibility_16', 'equal_to_1', 'equal_to_none', 'arg_properties', 'property_values',
-                 'constant_properties')
+
+    __slots__ = (
+        "divisibility_16",
+        "equal_to_1",
+        "equal_to_none",
+        "arg_properties",
+        "property_values",
+        "constant_properties",
+    )
 
     def __init__(self, params=None, values=None):
         """
@@ -76,7 +83,7 @@ class AttrsDescriptor:
         self._init_slots()
 
     def _add_common_properties(self, params, values):
-        """ Add common compile-time properties """
+        """Add common compile-time properties"""
         self.property_values["tt.divisibility"] = 16
         self.property_values["tt.equal_to"] = 1
         self.constant_properties.add("tt.equal_to")
@@ -85,16 +92,15 @@ class AttrsDescriptor:
             return
 
         # Compile properties deduction
-        assert (len(params) == len(values))
+        assert len(params) == len(values)
 
         # Divisibility property
         divisibility_16 = []
         for param, arg in zip(params, values):
-            if param.do_not_specialize or \
-               param.do_not_specialize_on_alignment:
+            if param.do_not_specialize or param.do_not_specialize_on_alignment:
                 continue
             paths = find_paths_if(arg, lambda path, val: AttrsDescriptor.is_divisible_by_16(val))
-            divisibility_16 += [(param.num, ) + x for x in paths]
+            divisibility_16 += [(param.num,) + x for x in paths]
         self.arg_properties["tt.divisibility"] = divisibility_16
 
         # Equal to 1 property
@@ -103,24 +109,24 @@ class AttrsDescriptor:
             if param.do_not_specialize:
                 continue
             paths = find_paths_if(arg, lambda path, val: AttrsDescriptor.is_equal_to_1(val))
-            equal_to_1 += [(param.num, ) + x for x in paths]
+            equal_to_1 += [(param.num,) + x for x in paths]
         self.arg_properties["tt.equal_to"] = equal_to_1
 
         # Equal to None property
         equal_to_none = []
         for param, arg in zip(params, values):
             paths = find_paths_if(arg, lambda path, val: val is None)
-            equal_to_none += [(param.num, ) + x for x in paths]
+            equal_to_none += [(param.num,) + x for x in paths]
         self.equal_to_none = equal_to_none
 
     def _add_backend_properties(self, params=None, values=None):
-        """ This method is for different subclasses to implement their own compile-time properties """
+        """This method is for different subclasses to implement their own compile-time properties"""
         pass
 
     def _init_slots(self):
-        """ Initialize the slots of this class """
+        """Initialize the slots of this class"""
         for name, val in self.arg_properties.items():
-            setattr(self, name.removeprefix('tt.') + '_' + str(self.property_values[name]), val)
+            setattr(self, name.removeprefix("tt.") + "_" + str(self.property_values[name]), val)
 
     def get_fn_attrs(self) -> Dict:
         """
@@ -140,7 +146,7 @@ class AttrsDescriptor:
         return attrs
 
     def get_constants(self) -> Dict:
-        """ Return a mapping of constant parameters to their values """
+        """Return a mapping of constant parameters to their values"""
         constants = {}
         for prop_name in self.constant_properties:
             for p in self.arg_properties.get(prop_name, []):
@@ -150,8 +156,9 @@ class AttrsDescriptor:
         return constants
 
     def filter_out_constants(self):
-        """ Return the same object, without properties marked as constants"""
+        """Return the same object, without properties marked as constants"""
         import copy
+
         c = copy.deepcopy(self)
         for prop_name in c.constant_properties:
             c.arg_properties.pop(prop_name, None)
@@ -206,7 +213,7 @@ class AttrsDescriptor:
 
     @staticmethod
     def is_divisible_by_16(x):
-        """ Return if the argument is a multiple of 16"""
+        """Return if the argument is a multiple of 16"""
         if hasattr(x, "data_ptr"):
             return x.data_ptr() % 16 == 0
         elif isinstance(x, int):
@@ -217,7 +224,7 @@ class AttrsDescriptor:
 
     @staticmethod
     def is_equal_to_1(x):
-        """ Return if the argument is a constant 1"""
+        """Return if the argument is a constant 1"""
         return True if isinstance(x, int) and not isinstance(x, bool) and x == 1 else False
 
     @staticmethod
@@ -242,7 +249,6 @@ class GPUTarget(object):
 
 
 class BaseBackend(metaclass=ABCMeta):
-
     def __init__(self, target: GPUTarget) -> None:
         self.target = target
         assert self.supports_target(target)
