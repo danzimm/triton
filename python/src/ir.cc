@@ -226,10 +226,6 @@ void init_triton_ir(py::module &&m) {
       .def("disable_multithreading",
            [](MLIRContext &self) { self.disableMultithreading(); });
 
-  py::class_<SourceMgrDiagnosticHandler>(m, "source_mgr_diag",
-                                         py::module_local())
-      .def(py::init<llvm::SourceMgr &, MLIRContext *>());
-
   m.def("load_dialects", [](MLIRContext &context) {
     DialectRegistry registry;
     registry.insert<TritonDialect, ::mlir::triton::gpu::TritonGPUDialect,
