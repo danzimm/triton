@@ -6,3 +6,28 @@ line-length = 120
 
 [tool.ruff.lint]
 ignore = ["E501", "E701", "E731", "E741"]
+
+[tool.mypy]
+files = ["python/triton/_utils.py"]
+exclude = ["**/*.py"]
+follow_imports = "skip"
+disallow_subclassing_any = true
+disallow_any_unimported = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+local_partial_types = true
+implicit_reexport = false
+strict = true
+
+[tool.pylsp-mypy]
+enabled = true
+live_mode = true
+follow-imports = "skip"
+exclude = ["^(?!.*_utils\\.py$).*"]

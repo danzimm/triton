@@ -707,6 +707,9 @@ float64 = dtype("fp64")
 pi32_t = pointer_type(int32)
 
 
+triton_type = dtype | constexpr | None
+
+
 def get_int_dtype(bitwidth: int, signed: bool) -> dtype:
     if bitwidth == 1:
         return int1

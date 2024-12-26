@@ -104,6 +104,7 @@ from .core import (
     tensor,
     trans,
     tuple,
+    triton_type,
     tuple_type,
     uint16,
     uint32,
@@ -250,6 +251,7 @@ __all__ = [
     "tensor",
     "trans",
     "triton",
+    "triton_type",
     "tuple",
     "uint16",
     "uint32",
@@ -266,7 +268,7 @@ __all__ = [
 ]
 
 
-def str_to_ty(name):
+def str_to_ty(name) -> triton_type:
     if name == "none":
         return None
 

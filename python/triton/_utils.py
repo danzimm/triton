@@ -1,9 +1,13 @@
-from typing import Tuple, List, Any
+from functools import reduce
+from typing import TypeVar, Iterable
+
 
 # Poor man's PyTree
 
+T = TypeVar("T")
 
-def list_list_flatten(x: List[List[Any]]) -> Tuple[List[int], List[Any]]:
+
+def list_list_flatten(x: list[list[T]]) -> tuple[list[int], list[T]]:
     spec = []
     flat = []
     for l in x:
@@ -12,7 +16,7 @@ def list_list_flatten(x: List[List[Any]]) -> Tuple[List[int], List[Any]]:
     return spec, flat
 
 
-def list_list_unflatten(spec: List[int], flat: List[Any]) -> List[List[Any]]:
+def list_list_unflatten(spec: list[int], flat: list[T]) -> list[list[T]]:
     ret = []
     idx = 0
     for size in spec:
@@ -22,9 +26,7 @@ def list_list_unflatten(spec: List[int], flat: List[Any]) -> List[List[Any]]:
     return ret
 
 
-def get_iterable_path(iterable, path):
-    from functools import reduce
-
+def get_iterable_path(iterable: Iterable[int], path):
     return reduce(lambda a, idx: a[idx], path, iterable)
 
 
@@ -59,7 +61,7 @@ def find_paths_if(iterable, pred):
     return list(ret.keys())
 
 
-def parse_list_string(s):
+def parse_list_string(s: str) -> list[str]:
     s = s.strip()
     if s.startswith("[") and s.endswith("]"):
         s = s[1:-1]
