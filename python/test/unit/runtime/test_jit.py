@@ -7,7 +7,6 @@ import triton.language as tl
 
 
 def test_pre_call_hooks(device):
-
     @triton.jit
     def add_kernel(
         in_ptr0,
@@ -39,4 +38,4 @@ def test_pre_call_hooks(device):
     y = MyTensor(x)
     out = torch.zeros_like(x)
     with pytest.raises(Exception):
-        add_kernel[(4, )](x, y, out, 4, 4)
+        add_kernel[(4,)](x, y, out, 4, 4)

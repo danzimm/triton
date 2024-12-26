@@ -32,6 +32,7 @@ from typing import Optional
 
 if torch.cuda.is_available():
     from triton._C.libtriton import nvidia
+
     cublas_workspace = torch.empty(32 * 1024 * 1024, device="cuda", dtype=torch.uint8)
     cublas = nvidia.cublas.CublasLt(cublas_workspace)
 else:
@@ -54,22 +55,30 @@ def _matmul_launch_metadata(grid, kernel, args):
         bytes_per_elem = args["c_ptr"].element_size()
     else:
         bytes_per_elem = 1 if args["FP8_OUTPUT"] else 2
-    ret[f"flops{bytes_per_elem * 8}"] = 2. * M * N * K
+    ret[f"flops{bytes_per_elem * 8}"] = 2.0 * M * N * K
     ret["bytes"] = bytes_per_elem * (M * K + N * K + M * N)
     return ret
 
 
 @triton.jit(launch_metadata=_matmul_launch_metadata)
-def matmul_kernel(a_ptr, b_ptr, c_ptr,  #
-                  M, N, K,  #
-                  stride_am, stride_ak,  #
-                  stride_bk, stride_bn,  #
-                  stride_cm, stride_cn,  #
-                  BLOCK_SIZE_M: tl.constexpr,  #
-                  BLOCK_SIZE_N: tl.constexpr,  #
-                  BLOCK_SIZE_K: tl.constexpr,  #
-                  GROUP_SIZE_M: tl.constexpr,  #
-                  ):
+def matmul_kernel(
+    a_ptr,
+    b_ptr,
+    c_ptr,  #
+    M,
+    N,
+    K,  #
+    stride_am,
+    stride_ak,  #
+    stride_bk,
+    stride_bn,  #
+    stride_cm,
+    stride_cn,  #
+    BLOCK_SIZE_M: tl.constexpr,  #
+    BLOCK_SIZE_N: tl.constexpr,  #
+    BLOCK_SIZE_K: tl.constexpr,  #
+    GROUP_SIZE_M: tl.constexpr,  #
+):
     pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
@@ -103,7 +112,7 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr,  #
         a_ptrs += BLOCK_SIZE_K * stride_ak
         b_ptrs += BLOCK_SIZE_K * stride_bk
 
-    if (c_ptr.dtype.element_ty == tl.float8e4nv):
+    if c_ptr.dtype.element_ty == tl.float8e4nv:
         c = accumulator.to(tl.float8e4nv)
     else:
         c = accumulator.to(tl.float16)
@@ -118,12 +127,21 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr,  #
 def matmul(a, b):
     configs = {
         torch.float8_e4m3fn: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 128, "GROUP_SIZE_M": 8, "num_stages": 4,
-            "num_warps": 8
-        }, torch.float16: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64, "GROUP_SIZE_M": 8, "num_stages": 3,
-            "num_warps": 8
-        }
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 128,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 4,
+            "num_warps": 8,
+        },
+        torch.float16: {
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 64,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 3,
+            "num_warps": 8,
+        },
     }
     # Check constraints.
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
@@ -134,13 +152,20 @@ def matmul(a, b):
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
     # 1D launch kernel where each block gets its own program.
-    grid = lambda META: (triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"]), )
+    grid = lambda META: (triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"]),)
     matmul_kernel[grid](
-        a, b, c,  #
-        M, N, K,  #
-        a.stride(0), a.stride(1),  #
-        b.stride(0), b.stride(1),  #
-        c.stride(0), c.stride(1),  #
+        a,
+        b,
+        c,  #
+        M,
+        N,
+        K,  #
+        a.stride(0),
+        a.stride(1),  #
+        b.stride(0),
+        b.stride(1),  #
+        c.stride(0),
+        c.stride(1),  #
         BLOCK_SIZE_M=configs[dtype]["BLOCK_SIZE_M"],  #
         BLOCK_SIZE_N=configs[dtype]["BLOCK_SIZE_N"],  #
         BLOCK_SIZE_K=configs[dtype]["BLOCK_SIZE_K"],  #
@@ -152,17 +177,25 @@ def matmul(a, b):
 
 
 @triton.jit(launch_metadata=_matmul_launch_metadata)
-def matmul_kernel_persistent(a_ptr, b_ptr, c_ptr,  #
-                             M, N, K,  #
-                             stride_am, stride_ak,  #
-                             stride_bk, stride_bn,  #
-                             stride_cm, stride_cn,  #
-                             BLOCK_SIZE_M: tl.constexpr,  #
-                             BLOCK_SIZE_N: tl.constexpr,  #
-                             BLOCK_SIZE_K: tl.constexpr,  #
-                             GROUP_SIZE_M: tl.constexpr,  #
-                             NUM_SMS: tl.constexpr,  #
-                             ):
+def matmul_kernel_persistent(
+    a_ptr,
+    b_ptr,
+    c_ptr,  #
+    M,
+    N,
+    K,  #
+    stride_am,
+    stride_ak,  #
+    stride_bk,
+    stride_bn,  #
+    stride_cm,
+    stride_cn,  #
+    BLOCK_SIZE_M: tl.constexpr,  #
+    BLOCK_SIZE_N: tl.constexpr,  #
+    BLOCK_SIZE_K: tl.constexpr,  #
+    GROUP_SIZE_M: tl.constexpr,  #
+    NUM_SMS: tl.constexpr,  #
+):
     start_pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
@@ -218,7 +251,7 @@ def matmul_kernel_persistent(a_ptr, b_ptr, c_ptr,  #
             offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
             c_ptrs = c_ptr + stride_cm * offs_cm[:, None] + stride_cn * offs_cn[None, :]
             c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
-            if (c_ptr.dtype.element_ty == tl.float8e4nv):
+            if c_ptr.dtype.element_ty == tl.float8e4nv:
                 c = accumulator.to(tl.float8e4nv)
             else:
                 c = accumulator.to(tl.float16)
@@ -229,12 +262,21 @@ def matmul_kernel_persistent(a_ptr, b_ptr, c_ptr,  #
 def matmul_persistent(a, b):
     configs = {
         torch.float8_e4m3fn: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 128, "GROUP_SIZE_M": 8, "num_stages": 4,
-            "num_warps": 8
-        }, torch.float16: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64, "GROUP_SIZE_M": 8, "num_stages": 3,
-            "num_warps": 8
-        }
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 128,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 4,
+            "num_warps": 8,
+        },
+        torch.float16: {
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 64,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 3,
+            "num_warps": 8,
+        },
     }
     # Check constraints.
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
@@ -246,13 +288,20 @@ def matmul_persistent(a, b):
     # Allocates output.
     c = torch.empty((M, N), device=a.device, dtype=dtype)
     # 1D launch kernel where each block gets its own program.
-    grid = lambda META: (min(NUM_SMS, triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"])), )
+    grid = lambda META: (min(NUM_SMS, triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"])),)
     matmul_kernel_persistent[grid](
-        a, b, c,  #
-        M, N, K,  #
-        a.stride(0), a.stride(1),  #
-        b.stride(0), b.stride(1),  #
-        c.stride(0), c.stride(1),  #
+        a,
+        b,
+        c,  #
+        M,
+        N,
+        K,  #
+        a.stride(0),
+        a.stride(1),  #
+        b.stride(0),
+        b.stride(1),  #
+        c.stride(0),
+        c.stride(1),  #
         BLOCK_SIZE_M=configs[dtype]["BLOCK_SIZE_M"],  #
         BLOCK_SIZE_N=configs[dtype]["BLOCK_SIZE_N"],  #
         BLOCK_SIZE_K=configs[dtype]["BLOCK_SIZE_K"],  #
@@ -265,14 +314,20 @@ def matmul_persistent(a, b):
 
 
 @triton.jit(launch_metadata=_matmul_launch_metadata)
-def matmul_kernel_tma_persistent(a_desc_ptr, b_desc_ptr, c_desc_ptr,  #
-                                 M, N, K,  #
-                                 BLOCK_SIZE_M: tl.constexpr,  #
-                                 BLOCK_SIZE_N: tl.constexpr,  #
-                                 BLOCK_SIZE_K: tl.constexpr,  #
-                                 GROUP_SIZE_M: tl.constexpr,  #
-                                 FP8_OUTPUT: tl.constexpr,  #
-                                 NUM_SMS: tl.constexpr):  #
+def matmul_kernel_tma_persistent(
+    a_desc_ptr,
+    b_desc_ptr,
+    c_desc_ptr,  #
+    M,
+    N,
+    K,  #
+    BLOCK_SIZE_M: tl.constexpr,  #
+    BLOCK_SIZE_N: tl.constexpr,  #
+    BLOCK_SIZE_K: tl.constexpr,  #
+    GROUP_SIZE_M: tl.constexpr,  #
+    FP8_OUTPUT: tl.constexpr,  #
+    NUM_SMS: tl.constexpr,
+):  #
     dtype = tl.float8e4nv if FP8_OUTPUT else tl.float16
     start_pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
@@ -326,12 +381,21 @@ def matmul_tma_persistent(a, b):
     # Autotuner does not work with TMA. Use manual config.
     configs = {
         torch.float8_e4m3fn: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 128, "GROUP_SIZE_M": 8, "num_stages": 4,
-            "num_warps": 8
-        }, torch.float16: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64, "GROUP_SIZE_M": 8, "num_stages": 3,
-            "num_warps": 8
-        }
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 128,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 4,
+            "num_warps": 8,
+        },
+        torch.float16: {
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 64,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 3,
+            "num_warps": 8,
+        },
     }
 
     # Check constraints.
@@ -343,24 +407,25 @@ def matmul_tma_persistent(a, b):
     dtype = a.dtype
 
     c = torch.empty((M, N), device=a.device, dtype=dtype)
-    desc_a = triton.tools.experimental_descriptor.create_2d_tma_descriptor(a.data_ptr(), M, K,
-                                                                           configs[dtype]["BLOCK_SIZE_M"],
-                                                                           configs[dtype]["BLOCK_SIZE_K"],
-                                                                           a.element_size())
-    desc_b = triton.tools.experimental_descriptor.create_2d_tma_descriptor(b.data_ptr(), N, K,
-                                                                           configs[dtype]["BLOCK_SIZE_N"],
-                                                                           configs[dtype]["BLOCK_SIZE_K"],
-                                                                           b.element_size())
-    desc_c = triton.tools.experimental_descriptor.create_2d_tma_descriptor(c.data_ptr(), M, N,
-                                                                           configs[dtype]["BLOCK_SIZE_M"],
-                                                                           configs[dtype]["BLOCK_SIZE_N"],
-                                                                           c.element_size())
+    desc_a = triton.tools.experimental_descriptor.create_2d_tma_descriptor(
+        a.data_ptr(), M, K, configs[dtype]["BLOCK_SIZE_M"], configs[dtype]["BLOCK_SIZE_K"], a.element_size()
+    )
+    desc_b = triton.tools.experimental_descriptor.create_2d_tma_descriptor(
+        b.data_ptr(), N, K, configs[dtype]["BLOCK_SIZE_N"], configs[dtype]["BLOCK_SIZE_K"], b.element_size()
+    )
+    desc_c = triton.tools.experimental_descriptor.create_2d_tma_descriptor(
+        c.data_ptr(), M, N, configs[dtype]["BLOCK_SIZE_M"], configs[dtype]["BLOCK_SIZE_N"], c.element_size()
+    )
     NUM_SMS = torch.cuda.get_device_properties("cuda").multi_processor_count
 
-    grid = lambda META: (min(NUM_SMS, triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"])), )
+    grid = lambda META: (min(NUM_SMS, triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"])),)
     matmul_kernel_tma_persistent[grid](
-        desc_a, desc_b, desc_c,  #
-        M, N, K,  #
+        desc_a,
+        desc_b,
+        desc_c,  #
+        M,
+        N,
+        K,  #
         BLOCK_SIZE_M=configs[dtype]["BLOCK_SIZE_M"],  #
         BLOCK_SIZE_N=configs[dtype]["BLOCK_SIZE_N"],  #
         BLOCK_SIZE_K=configs[dtype]["BLOCK_SIZE_K"],  #
@@ -374,13 +439,19 @@ def matmul_tma_persistent(a, b):
 
 
 @triton.jit(launch_metadata=_matmul_launch_metadata)
-def matmul_kernel_descriptor_persistent(a_ptr, b_ptr, c_ptr,  #
-                                        M, N, K,  #
-                                        BLOCK_SIZE_M: tl.constexpr,  #
-                                        BLOCK_SIZE_N: tl.constexpr,  #
-                                        BLOCK_SIZE_K: tl.constexpr,  #
-                                        GROUP_SIZE_M: tl.constexpr,  #
-                                        NUM_SMS: tl.constexpr):  #
+def matmul_kernel_descriptor_persistent(
+    a_ptr,
+    b_ptr,
+    c_ptr,  #
+    M,
+    N,
+    K,  #
+    BLOCK_SIZE_M: tl.constexpr,  #
+    BLOCK_SIZE_N: tl.constexpr,  #
+    BLOCK_SIZE_K: tl.constexpr,  #
+    GROUP_SIZE_M: tl.constexpr,  #
+    NUM_SMS: tl.constexpr,
+):  #
     # Matmul using TMA and device-side descriptor creation
     dtype = c_ptr.dtype.element_ty
     start_pid = tl.program_id(axis=0)
@@ -427,7 +498,6 @@ def matmul_kernel_descriptor_persistent(a_ptr, b_ptr, c_ptr,  #
     for _ in range(0, k_tiles * tiles_per_SM):
         ki = tl.where(ki == k_tiles - 1, 0, ki + 1)
         if ki == 0:
-
             tile_id += NUM_SMS
             group_id = tile_id // num_pid_in_group
             first_pid_m = group_id * GROUP_SIZE_M
@@ -455,12 +525,21 @@ def matmul_kernel_descriptor_persistent(a_ptr, b_ptr, c_ptr,  #
 def matmul_descriptor_persistent(a, b):
     configs = {
         torch.float8_e4m3fn: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 128, "GROUP_SIZE_M": 8, "num_stages": 4,
-            "num_warps": 8
-        }, torch.float16: {
-            "BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64, "GROUP_SIZE_M": 8, "num_stages": 3,
-            "num_warps": 8
-        }
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 128,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 4,
+            "num_warps": 8,
+        },
+        torch.float16: {
+            "BLOCK_SIZE_M": 128,
+            "BLOCK_SIZE_N": 256,
+            "BLOCK_SIZE_K": 64,
+            "GROUP_SIZE_M": 8,
+            "num_stages": 3,
+            "num_warps": 8,
+        },
     }
 
     # Check constraints.
@@ -480,10 +559,14 @@ def matmul_descriptor_persistent(a, b):
 
     triton.set_allocator(alloc_fn)
 
-    grid = lambda META: (min(NUM_SMS, triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"])), )
+    grid = lambda META: (min(NUM_SMS, triton.cdiv(M, META["BLOCK_SIZE_M"]) * triton.cdiv(N, META["BLOCK_SIZE_N"])),)
     matmul_kernel_descriptor_persistent[grid](
-        a, b, c,  #
-        M, N, K,  #
+        a,
+        b,
+        c,  #
+        M,
+        N,
+        K,  #
         BLOCK_SIZE_M=configs[dtype]["BLOCK_SIZE_M"],  #
         BLOCK_SIZE_N=configs[dtype]["BLOCK_SIZE_N"],  #
         BLOCK_SIZE_K=configs[dtype]["BLOCK_SIZE_K"],  #
@@ -504,8 +587,9 @@ def cublas_matmul(a, b):
     c = torch.empty((M, N), device=a.device, dtype=dtype)
     bytes_per_elem = a.element_size()
     flops_str = f"flops{bytes_per_elem * 8}"
-    with proton.scope(f"cublas [M={M}, N={N}, K={K}]",
-                      {"bytes": bytes_per_elem * (M * K + N * K + M * N), flops_str: 2. * M * N * K}):
+    with proton.scope(
+        f"cublas [M={M}, N={N}, K={K}]", {"bytes": bytes_per_elem * (M * K + N * K + M * N), flops_str: 2.0 * M * N * K}
+    ):
         cublas.matmul(a, b, c)
     return c
 
@@ -515,8 +599,9 @@ def torch_matmul(a, b):
     N, K = b.shape
     bytes_per_elem = a.element_size()
     flops_str = f"flops{bytes_per_elem * 8}"
-    with proton.scope(f"torch [M={M}, N={N}, K={K}]",
-                      {"bytes": bytes_per_elem * (M * K + N * K + M * N), flops_str: 2. * M * N * K}):
+    with proton.scope(
+        f"torch [M={M}, N={N}, K={K}]", {"bytes": bytes_per_elem * (M * K + N * K + M * N), flops_str: 2.0 * M * N * K}
+    ):
         c = torch.matmul(a, b.T)
     return c
 
@@ -570,19 +655,28 @@ def validate(M, N, K, dtype):
     descriptor_persistent_result = matmul_descriptor_persistent(a, b) if supports_tma() else None
 
     if torch_result is not None:
-        naive_vs_torch = "✅" if torch.allclose(naive_result.to(torch.float16), torch_result.to(torch.float16),
-                                               atol=1.0) else "❌"
+        naive_vs_torch = (
+            "✅" if torch.allclose(naive_result.to(torch.float16), torch_result.to(torch.float16), atol=1.0) else "❌"
+        )
     if cublas_result is not None:
-        naive_vs_cublas = "✅" if torch.allclose(naive_result.to(torch.float16), cublas_result.to(torch.float16),
-                                                atol=1.0) else "❌"
-    naive_vs_persistent = "✅" if torch.allclose(naive_result.to(torch.float16), persistent_result.to(torch.float16),
-                                                atol=1.0) else "❌"
+        naive_vs_cublas = (
+            "✅" if torch.allclose(naive_result.to(torch.float16), cublas_result.to(torch.float16), atol=1.0) else "❌"
+        )
+    naive_vs_persistent = (
+        "✅" if torch.allclose(naive_result.to(torch.float16), persistent_result.to(torch.float16), atol=1.0) else "❌"
+    )
     if tma_persistent_result is not None:
-        naive_vs_tma_persistent = "✅" if torch.allclose(cublas_result.to(torch.float16),
-                                                        tma_persistent_result.to(torch.float16), atol=1.0) else "❌"
+        naive_vs_tma_persistent = (
+            "✅"
+            if torch.allclose(cublas_result.to(torch.float16), tma_persistent_result.to(torch.float16), atol=1.0)
+            else "❌"
+        )
     if descriptor_persistent_result is not None:
-        naive_vs_descriptor_persistent = "✅" if torch.allclose(cublas_result.to(
-            torch.float16), descriptor_persistent_result.to(torch.float16), atol=1.0) else "❌"
+        naive_vs_descriptor_persistent = (
+            "✅"
+            if torch.allclose(cublas_result.to(torch.float16), descriptor_persistent_result.to(torch.float16), atol=1.0)
+            else "❌"
+        )
     print(f"M={M}, N={N}, K={K} verification naive vs: ", end="")
     if torch_result is not None:
         print(f"torch: {naive_vs_torch} ", end="")
@@ -598,10 +692,11 @@ def validate(M, N, K, dtype):
 
 def show_profile(precision, profile_name):
     import triton.profiler.viewer as proton_viewer
+
     metrics = ["time/ms"]
-    if precision == 'fp8':
+    if precision == "fp8":
         metrics = ["tflop8/s"] + metrics
-    elif precision == 'fp16':
+    elif precision == "fp16":
         metrics = ["tflop16/s"] + metrics
     file_name = f"{profile_name}.hatchet"
     proton_viewer.parse(metrics, file_name, depth=100)
@@ -615,11 +710,11 @@ if __name__ == "__main__":
     parser.add_argument("--prec", type=str, choices=["fp8", "fp16"], default="fp16")
     args = parser.parse_args()
 
-    if args.prec == 'fp8' and (not hasattr(torch, "float8_e4m3fn") or not is_cuda()):
+    if args.prec == "fp8" and (not hasattr(torch, "float8_e4m3fn") or not is_cuda()):
         print("This example requires CUDA with fp8 support.")
         exit(1)
 
-    dtype = torch.float8_e4m3fn if args.prec == 'fp8' else torch.float16
+    dtype = torch.float8_e4m3fn if args.prec == "fp8" else torch.float16
 
     if args.K and args.K_range is None:
         args.K_range = [args.K, args.K]

@@ -113,8 +113,7 @@ from .core import (
     void,
     where,
 )
-from .math import (umulhi, exp, exp2, fma, log, log2, cos, rsqrt, sin, sqrt, sqrt_rn, abs, fdiv, div_rn, erf, floor,
-                   ceil)
+from .math import umulhi, exp, exp2, fma, log, log2, cos, rsqrt, sin, sqrt, sqrt_rn, abs, fdiv, div_rn, erf, floor, ceil
 from .random import (
     pair_uniform_to_normal,
     philox,

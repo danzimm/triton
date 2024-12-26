@@ -8,14 +8,14 @@ backend = make_backend(target)
 
 
 def test_mlir_attribute_parsing(tmp_path: pathlib.Path) -> None:
-    '''
+    """
     Tests that MLIR attributes are parsed correctly from input ttir/ttgir.
 
     Checks for the following:
     1. Name and type signature are parsed correctly
     2. _get_num_warps_from_ir_str() works
     3. tt.nv_tma_desc attribute is parsed correctly
-    '''
+    """
 
     sample_ttgir = r"""
 #blocked = #ttg.blocked<{sizePerThread = [1, 4], threadsPerWarp = [8, 4], warpsPerCTA = [8, 1], order = [1, 0]}>
@@ -45,13 +45,22 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 8 : i32, ttg.targ
 
     # check name and type signature
     # should match ty_to_cpp(...)
-    assert  src.signature == \
-                {0: "*f32", 1: "*f32", 2: "*f32", 3: "i32", \
-                        4: "i32", 5: "i32", 6: "i32", 7: "i32", 8: "nvTmaDesc", 9: "nvTmaDesc"}
+    assert src.signature == {
+        0: "*f32",
+        1: "*f32",
+        2: "*f32",
+        3: "i32",
+        4: "i32",
+        5: "i32",
+        6: "i32",
+        7: "i32",
+        8: "nvTmaDesc",
+        9: "nvTmaDesc",
+    }
     assert src.name == "@matmul_kernel"
 
     # check num warps
-    assert src.parse_options()['num_warps'] == 8
+    assert src.parse_options()["num_warps"] == 8
 
     sample_ttgir_vector_add = r"""
     #blocked = #ttg.blocked<{sizePerThread = [4], threadsPerWarp = [32], warpsPerCTA = [4], order = [0]}>

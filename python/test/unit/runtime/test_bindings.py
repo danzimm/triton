@@ -63,11 +63,8 @@ def test_module_walk(device):
     backend = triton.compiler.compiler.make_backend(target)
     src = triton.compiler.compiler.ASTSource(
         fn=kernel,
-        signature={kernel.arg_names[i]: kernel._type_of(kernel._key_of(arg))
-                   for i, arg in enumerate(args)},
-        constexprs={kernel.arg_names[i]: arg
-                    for i, arg in enumerate(args)
-                    if not isinstance(arg, torch.Tensor)},
+        signature={kernel.arg_names[i]: kernel._type_of(kernel._key_of(arg)) for i, arg in enumerate(args)},
+        constexprs={kernel.arg_names[i]: arg for i, arg in enumerate(args) if not isinstance(arg, torch.Tensor)},
         attrs=backend.get_attrs_descriptor(kernel.params, args),
     )
 
@@ -83,7 +80,6 @@ def test_module_walk(device):
 
 
 def test_python_func_in_visit_call(device):
-
     @triton.jit
     def test_py_call_const_kernel(
         in_ptr0,
@@ -102,4 +98,4 @@ def test_python_func_in_visit_call(device):
 
     x = torch.randn(4, device=device)
     out = torch.zeros_like(x)
-    test_py_call_const_kernel[(4, )](x, out, 4, 4)
+    test_py_call_const_kernel[(4,)](x, out, 4, 4)

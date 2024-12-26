@@ -40,7 +40,6 @@ def test_torch(context, tmp_path: pathlib.Path):
 
 
 def test_triton(tmp_path: pathlib.Path):
-
     @triton.jit
     def foo(x, y):
         tl.store(y, tl.load(x))
@@ -51,9 +50,9 @@ def test_triton(tmp_path: pathlib.Path):
     proton.start(str(temp_file.with_suffix("")))
     with proton.scope("test0"):
         with proton.scope("test1"):
-            foo[(1, )](x, y)
+            foo[(1,)](x, y)
     with proton.scope("test2"):
-        foo[(1, )](x, y)
+        foo[(1,)](x, y)
     proton.finalize()
     with temp_file.open() as f:
         data = json.load(f)
@@ -76,7 +75,7 @@ def test_cudagraph(tmp_path: pathlib.Path):
         a = torch.ones((2, 2), device="cuda")
         b = torch.ones((2, 2), device="cuda")
         c = a + b
-        foo[(1, )](a, b, c)
+        foo[(1,)](a, b, c)
 
     temp_file = tmp_path / "test_cudagraph.hatchet"
     proton.start(str(temp_file.with_suffix("")), context="shadow")
@@ -119,7 +118,6 @@ def test_cudagraph(tmp_path: pathlib.Path):
 
 
 def test_metrics(tmp_path: pathlib.Path):
-
     @triton.jit
     def foo(x, y):
         tl.store(y, tl.load(x))
@@ -129,7 +127,7 @@ def test_metrics(tmp_path: pathlib.Path):
     temp_file = tmp_path / "test_metrics.hatchet"
     proton.start(str(temp_file.with_suffix("")))
     with proton.scope("test0", {"foo": 1.0}):
-        foo[(1, )](x, y)
+        foo[(1,)](x, y)
     proton.finalize()
     with temp_file.open() as f:
         data = json.load(f)
@@ -158,7 +156,6 @@ def test_scope_backward(tmp_path: pathlib.Path):
 
 
 def test_hook(tmp_path: pathlib.Path):
-
     def metadata_fn(grid: tuple, metadata: NamedTuple, args: dict):
         # get arg's element size
         element_size = args["x"].element_size()  # non-const
@@ -177,7 +174,7 @@ def test_hook(tmp_path: pathlib.Path):
     temp_file = tmp_path / "test_hook.hatchet"
     proton.start(str(temp_file.with_suffix("")), hook="triton")
     with proton.scope("test0"):
-        foo[(1, )](x, 1, y, num_warps=4)
+        foo[(1,)](x, 1, y, num_warps=4)
     proton.finalize()
     with temp_file.open() as f:
         data = json.load(f)
@@ -207,7 +204,7 @@ def test_hook_gpu_kernel(tmp_path: pathlib.Path, context: str):
     temp_file = tmp_path / "test_hook.hatchet"
     proton.start(str(temp_file.with_suffix("")), hook="triton", context=context)
     with proton.scope("test0"):
-        foo[(1, )](x, 1, y, num_warps=4)
+        foo[(1,)](x, 1, y, num_warps=4)
     proton.finalize()
     with temp_file.open() as f:
         data = json.load(f)
@@ -227,6 +224,7 @@ def test_pcsampling(tmp_path: pathlib.Path):
         pytest.skip("HIP backend does not support pc sampling")
 
     import os
+
     if os.environ.get("PROTON_SKIP_PC_SAMPLING_TEST", "0") == "1":
         pytest.skip("PC sampling test is disabled")
 
@@ -239,10 +237,10 @@ def test_pcsampling(tmp_path: pathlib.Path):
     temp_file = tmp_path / "test_pcsampling.hatchet"
     proton.start(str(temp_file.with_suffix("")), hook="triton", backend="cupti_pcsampling")
     with proton.scope("init"):
-        x = torch.ones((1024, ), device="cuda", dtype=torch.float32)
+        x = torch.ones((1024,), device="cuda", dtype=torch.float32)
         y = torch.zeros_like(x)
     with proton.scope("test"):
-        foo[(1, )](x, y, x.size()[0], num_warps=4)
+        foo[(1,)](x, y, x.size()[0], num_warps=4)
     proton.finalize()
     with temp_file.open() as f:
         data = json.load(f)

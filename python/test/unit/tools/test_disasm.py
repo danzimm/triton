@@ -13,8 +13,8 @@ def test_disam_cubin():
     def kernel(X, i: tl.constexpr):
         tl.store(X, i)
 
-    x = torch.empty(1, dtype=torch.int32, device='cuda')
-    h = kernel[(1, )](x, i=12)
+    x = torch.empty(1, dtype=torch.int32, device="cuda")
+    h = kernel[(1,)](x, i=12)
     assert x[0] == 12
     sass = h.asm["sass"]
     # check that the sass has a store instruction.

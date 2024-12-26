@@ -14,31 +14,33 @@ torch_types = ["int8", "uint8", "int16", "int32", "long", "float16", "float32", 
 
 
 def is_interpreter():
-    return os.environ.get('TRITON_INTERPRET', '0') == '1'
+    return os.environ.get("TRITON_INTERPRET", "0") == "1"
 
 
 # TODO: Print with multiple operands
 
 
 @pytest.mark.interpreter
-@pytest.mark.parametrize("func_type, data_type", [(fn, data_type)
-                                                  for fn in ["device_print", "device_print_scalar"]
-                                                  for data_type in torch_types] + [
-                                                      ("print", "int32"),
-                                                      ("static_print", "int32"),
-                                                      ("no_arg_print", "int32"),
-                                                      ("print_no_arg", "int32"),
-                                                      ("device_print_large", "int32"),
-                                                      ("print_multiple_args", "int32"),
-                                                      ("device_print_multiple_args", "int32"),
-                                                      ("device_print_hex", "int16"),
-                                                      ("device_print_hex", "int32"),
-                                                      ("device_print_hex", "int64"),
-                                                      ("device_print_pointer", "int32"),
-                                                      ("device_print_negative", "int32"),
-                                                      ("device_print_uint", "uint32"),
-                                                      ("device_print_2d_tensor", "int32"),
-                                                  ])
+@pytest.mark.parametrize(
+    "func_type, data_type",
+    [(fn, data_type) for fn in ["device_print", "device_print_scalar"] for data_type in torch_types]
+    + [
+        ("print", "int32"),
+        ("static_print", "int32"),
+        ("no_arg_print", "int32"),
+        ("print_no_arg", "int32"),
+        ("device_print_large", "int32"),
+        ("print_multiple_args", "int32"),
+        ("device_print_multiple_args", "int32"),
+        ("device_print_hex", "int16"),
+        ("device_print_hex", "int32"),
+        ("device_print_hex", "int64"),
+        ("device_print_pointer", "int32"),
+        ("device_print_negative", "int32"),
+        ("device_print_uint", "uint32"),
+        ("device_print_2d_tensor", "int32"),
+    ],
+)
 def test_print(func_type: str, data_type: str, device: str):
     proc = subprocess.run(
         [sys.executable, print_path, "test_print", func_type, data_type, device],
@@ -49,7 +51,7 @@ def test_print(func_type: str, data_type: str, device: str):
     if is_interpreter() and func_type != "static_assert":
         # Interpreter uses a different format for device_print
         # Only check if there's no error
-        assert proc.stderr == b''
+        assert proc.stderr == b""
         return
 
     outs = [line for line in proc.stdout.decode("UTF-8").splitlines() if line]
@@ -115,7 +117,7 @@ def test_print(func_type: str, data_type: str, device: str):
     actual_lines = Counter()
     for line in outs:
         # Trim the exact pointer address in the output--they can change per run.
-        line = (line.split(':')[0] + ": 0x") if func_type == "device_print_pointer" else line
+        line = (line.split(":")[0] + ": 0x") if func_type == "device_print_pointer" else line
         actual_lines[line] += 1
 
     diff = Counter(actual_lines)

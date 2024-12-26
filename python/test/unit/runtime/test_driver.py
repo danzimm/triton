@@ -8,6 +8,7 @@ import triton.language as tl
 
 def test_is_lazy():
     from importlib import reload
+
     reload(sys.modules["triton.runtime.driver"])
     reload(sys.modules["triton.runtime"])
     mod = sys.modules[triton.runtime.driver.__module__]
@@ -19,7 +20,7 @@ def test_is_lazy():
 
 def test_kernel_in_thread(device):
     # Test calling in a new thread sets a valid device context
-    buf = torch.zeros((38016 * 1024, ), dtype=torch.float32, device=device)
+    buf = torch.zeros((38016 * 1024,), dtype=torch.float32, device=device)
 
     @triton.jit
     def _kernel(P, BLOCK: tl.constexpr):
@@ -31,7 +32,7 @@ def test_kernel_in_thread(device):
 
     def call_triton():
         N = buf.numel()
-        grid = lambda meta: (triton.cdiv(N, meta["BLOCK"]), )
+        grid = lambda meta: (triton.cdiv(N, meta["BLOCK"]),)
         _kernel[grid](buf, BLOCK=1024)
         getattr(torch, device).synchronize()
 

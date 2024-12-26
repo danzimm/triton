@@ -7,11 +7,10 @@ from triton.backends.compiler import AttrsDescriptor
 from triton.compiler import ASTSource
 
 target = triton.runtime.driver.active.get_current_target()
-start_method = 'fork' if 'fork' in multiprocessing.get_all_start_methods() else 'spawn'
+start_method = "fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn"
 
 
 def compile_fn(attrs):
-
     @triton.jit
     def kernel_sub(a, b, o, N: tl.constexpr):
         idx = tl.arange(0, N)
@@ -19,8 +18,8 @@ def compile_fn(attrs):
 
     src = ASTSource(
         fn=kernel_sub,
-        constexprs={'N': 32},
-        signature={'a': "*fp32", 'b': "*fp32", 'o': "*fp32", 'N': 'constexpr'},
+        constexprs={"N": 32},
+        signature={"a": "*fp32", "b": "*fp32", "o": "*fp32", "N": "constexpr"},
         attrs=attrs,
     )
     triton.compile(src=src, target=target)
@@ -29,14 +28,13 @@ def compile_fn(attrs):
 def test_compile_in_subproc() -> None:
     config = AttrsDescriptor.from_hints({i: 16 for i in range(4)})
     mp_ctx = multiprocessing.get_context(start_method)
-    proc = mp_ctx.Process(target=compile_fn, args=(config, ))
+    proc = mp_ctx.Process(target=compile_fn, args=(config,))
     proc.start()
     proc.join()
     assert proc.exitcode == 0
 
 
 def compile_fn_dot(attrs):
-
     @triton.jit
     def kernel_dot(Z):
         offs = tl.arange(0, 16)[:, None] * 16 + tl.arange(0, 16)[None, :]
@@ -44,33 +42,33 @@ def compile_fn_dot(attrs):
         z = tl.dot(z, z)
         tl.store(Z + offs, z)
 
-    src = ASTSource(fn=kernel_dot, signature={'Z': "*fp32"}, attrs=attrs, constexprs={})
+    src = ASTSource(fn=kernel_dot, signature={"Z": "*fp32"}, attrs=attrs, constexprs={})
     triton.compile(src=src, target=target)
 
 
 def test_compile_in_forked_subproc(fresh_triton_cache) -> None:
     config = AttrsDescriptor.from_hints({0: 16})
     mp_ctx = multiprocessing.get_context(start_method)
-    proc = mp_ctx.Process(target=compile_fn_dot, args=(config, ))
+    proc = mp_ctx.Process(target=compile_fn_dot, args=(config,))
     proc.start()
     proc.join()
     assert proc.exitcode == 0
 
 
 def compile_empty_kernel_with_gc(attrs):
-
     @triton.jit
     def empty_kernel():
         pass
 
     import gc
+
     gc.collect()
     src = ASTSource(fn=empty_kernel, signature={}, attrs=attrs, constexprs={})
     triton.compile(src=src, target=target)
 
 
 def test_compile_in_forked_subproc_with_forced_gc(fresh_triton_cache) -> None:
-    '''
+    """
     Tests that compilation artifacts can safely live in forked process.
 
     Scenario being tested here ("p" stands for parent process, "c" is child process):
@@ -81,8 +79,9 @@ def test_compile_in_forked_subproc_with_forced_gc(fresh_triton_cache) -> None:
 
     This is a regression test that ensures thread pool in MLIRContext is released
     safely after compilation.
-    '''
+    """
     import gc
+
     old_gc_state = gc.isenabled()
     # disable GC to manage resources manually in the manner described in comment above
     gc.disable()
@@ -94,7 +93,7 @@ def test_compile_in_forked_subproc_with_forced_gc(fresh_triton_cache) -> None:
     # stage 2.p
     shutil.rmtree(fresh_triton_cache)
     mp_ctx = multiprocessing.get_context(start_method)
-    proc = mp_ctx.Process(target=compile_empty_kernel_with_gc, args=(config, ))
+    proc = mp_ctx.Process(target=compile_empty_kernel_with_gc, args=(config,))
 
     # stage 3.c
     proc.start()

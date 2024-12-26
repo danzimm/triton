@@ -18,14 +18,28 @@ def check_capabilities():
 
 @triton.jit
 def matmul_kernel(  #
-        a_ptr, scale_ptr, b_ptr, output_ptr,  #
-        M, N, K_MXFP,  # K_MXFP is the number of mxfp vectors in a row of a. Otherwise it's just K
-        stride_am, stride_ak,  #
-        stride_sm, stride_sk,  #
-        stride_bk, stride_bn,  #
-        stride_cm, stride_cn,  #
-        BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr,  #
-        NUM_STAGES: tl.constexpr, a_type: tl.constexpr, b_type: tl.constexpr):
+    a_ptr,
+    scale_ptr,
+    b_ptr,
+    output_ptr,  #
+    M,
+    N,
+    K_MXFP,  # K_MXFP is the number of mxfp vectors in a row of a. Otherwise it's just K
+    stride_am,
+    stride_ak,  #
+    stride_sm,
+    stride_sk,  #
+    stride_bk,
+    stride_bn,  #
+    stride_cm,
+    stride_cn,  #
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    BLOCK_K: tl.constexpr,  #
+    NUM_STAGES: tl.constexpr,
+    a_type: tl.constexpr,
+    b_type: tl.constexpr,
+):
     pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_M)
     pid_m = pid % num_pid_m
@@ -75,10 +89,17 @@ def matmul_kernel(  #
 
 @triton.jit
 def matmul_kernel_tma(  #
-        a_ptr, b_ptr, output_ptr,  #
-        M, N, K,  #
-        BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr,  #
-        NUM_STAGES: tl.constexpr):
+    a_ptr,
+    b_ptr,
+    output_ptr,  #
+    M,
+    N,
+    K,  #
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    BLOCK_K: tl.constexpr,  #
+    NUM_STAGES: tl.constexpr,
+):
     pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_M)
     pid_m = pid % num_pid_m
@@ -132,8 +153,9 @@ def mxfp_to_bf16_kernel(
     LAST_DIM: tl.constexpr = 32 if is_fp8 else 16
     LOAD_SIZE: tl.constexpr = LAST_DIM * PARALLEL_DIM
 
-    offsets = (tl.program_id(0) * LOAD_SIZE + tl.arange(0, PARALLEL_DIM)[:, None] * LAST_DIM +
-               tl.arange(0, LAST_DIM)[None, :])
+    offsets = (
+        tl.program_id(0) * LOAD_SIZE + tl.arange(0, PARALLEL_DIM)[:, None] * LAST_DIM + tl.arange(0, LAST_DIM)[None, :]
+    )
     x = tl.load(x_ptr + offsets, mask=offsets < N * LAST_DIM)
 
     offsets = tl.program_id(0) * PARALLEL_DIM + tl.arange(0, PARALLEL_DIM)[:, None]
@@ -190,16 +212,15 @@ def dot_scale_ref(x, scale, y, type_x, type_y):
     out_dtype = torch.bfloat16
 
     x = x.contiguous()
-    x_upcast = x.new_empty(scale.shape[:-1] + (32 * scale.shape[-1], ), dtype=comp_dtype)
+    x_upcast = x.new_empty(scale.shape[:-1] + (32 * scale.shape[-1],), dtype=comp_dtype)
 
     N = x_upcast.numel()
     BLOCK_SIZE = 512
-    grid = ((N + BLOCK_SIZE - 1) // BLOCK_SIZE, )
+    grid = ((N + BLOCK_SIZE - 1) // BLOCK_SIZE,)
     mxfp_to_bf16_kernel[grid](x, scale, x_upcast, scale.numel(), e_bits, m_bits, BLOCK_SIZE, num_warps=4)
     y_upcast = y.view(type_fp8_y)
 
     class AccumulateInFp32:
-
         def __enter__(self):
             self.prev_value = torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction
             torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
@@ -248,22 +269,46 @@ def test_pipeline_matmul(scale, device):
     use_tma = not scale and is_hopper()
 
     if use_tma:
-        a_tma = triton.tools.experimental_descriptor.create_2d_tma_descriptor(a.data_ptr(), M, K, BLOCK_M, BLOCK_K,
-                                                                              a.element_size())
-        b_tma = triton.tools.experimental_descriptor.create_2d_tma_descriptor(b.data_ptr(), K, N, BLOCK_K, BLOCK_N,
-                                                                              b.element_size())
-        output_tma = triton.tools.experimental_descriptor.create_2d_tma_descriptor(output.data_ptr(), M, N, BLOCK_M,
-                                                                                   BLOCK_N, output.element_size())
-        handler = matmul_kernel_tma[grid](a_tma, b_tma, output_tma, M, N, K, BLOCK_M, BLOCK_N, BLOCK_K,
-                                          NUM_STAGES=NUM_STAGES)
+        a_tma = triton.tools.experimental_descriptor.create_2d_tma_descriptor(
+            a.data_ptr(), M, K, BLOCK_M, BLOCK_K, a.element_size()
+        )
+        b_tma = triton.tools.experimental_descriptor.create_2d_tma_descriptor(
+            b.data_ptr(), K, N, BLOCK_K, BLOCK_N, b.element_size()
+        )
+        output_tma = triton.tools.experimental_descriptor.create_2d_tma_descriptor(
+            output.data_ptr(), M, N, BLOCK_M, BLOCK_N, output.element_size()
+        )
+        handler = matmul_kernel_tma[grid](
+            a_tma, b_tma, output_tma, M, N, K, BLOCK_M, BLOCK_N, BLOCK_K, NUM_STAGES=NUM_STAGES
+        )
     else:
         # Pass K_MXFP to make explicit that KB is multiple of 32 and KA is multiple of 16 or 32º
         if scale:
             K = scale_a.shape[-1]
         stride_sm, stride_sk = scale_a.stride() if scale else (0, 0)
-        handler = matmul_kernel[grid](a, scale_a, b, output, M, N, K, a.stride(0), a.stride(1), stride_sm, stride_sk,
-                                      b.stride(0), b.stride(1), output.stride(0), output.stride(1), BLOCK_M, BLOCK_N,
-                                      BLOCK_K, NUM_STAGES=NUM_STAGES, a_type=a_type, b_type=b_type)
+        handler = matmul_kernel[grid](
+            a,
+            scale_a,
+            b,
+            output,
+            M,
+            N,
+            K,
+            a.stride(0),
+            a.stride(1),
+            stride_sm,
+            stride_sk,
+            b.stride(0),
+            b.stride(1),
+            output.stride(0),
+            output.stride(1),
+            BLOCK_M,
+            BLOCK_N,
+            BLOCK_K,
+            NUM_STAGES=NUM_STAGES,
+            a_type=a_type,
+            b_type=b_type,
+        )
     if scale:
         ref_out = dot_scale_ref(a, scale_a, b, a_type, b_type)
     else:
@@ -325,17 +370,24 @@ def test_pipeline_vecadd(device):
 @pytest.mark.parametrize("ROW_COUNT", [0, 1, 2, 3])
 @pytest.mark.parametrize("NUM_STAGES", [1, 2, 3, 4, 5])
 def test_pipeline_epilogue(ROW_COUNT, NUM_STAGES, device):
-
     @triton.jit
-    def kernel_up(output_ptr, input_ptr, input_row_stride, output_row_stride, n_rows, n_cols, BLOCK_SIZE: tl.constexpr,
-                  NUM_STAGES: tl.constexpr):
+    def kernel_up(
+        output_ptr,
+        input_ptr,
+        input_row_stride,
+        output_row_stride,
+        n_rows,
+        n_cols,
+        BLOCK_SIZE: tl.constexpr,
+        NUM_STAGES: tl.constexpr,
+    ):
         row_step = tl.num_programs(0)
         col_offsets = tl.arange(0, BLOCK_SIZE)
         mask = col_offsets < n_cols
         for row_idx in tl.range(0, n_rows, row_step, num_stages=NUM_STAGES):
             row_start_ptr = input_ptr + row_idx * input_row_stride
             input_ptrs = row_start_ptr + col_offsets
-            val = tl.load(input_ptrs, mask=mask, other=-float('inf'))
+            val = tl.load(input_ptrs, mask=mask, other=-float("inf"))
             val += 1.0
             output_row_start_ptr = output_ptr + row_idx * output_row_stride
             output_ptrs = output_row_start_ptr + col_offsets
@@ -347,5 +399,5 @@ def test_pipeline_epilogue(ROW_COUNT, NUM_STAGES, device):
     y0 = torch.rand_like(x)
     n_rows, n_cols = x.shape
     BLOCK_SIZE = triton.next_power_of_2(n_cols)
-    kernel_up[(1, )](y0, x, x.stride(0), y0.stride(0), n_rows, n_cols, BLOCK_SIZE, NUM_STAGES)
+    kernel_up[(1,)](y0, x, x.stride(0), y0.stride(0), n_rows, n_cols, BLOCK_SIZE, NUM_STAGES)
     assert (y0 == torch.ones_like(x)).all()

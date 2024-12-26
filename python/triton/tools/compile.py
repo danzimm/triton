@@ -38,16 +38,18 @@ used to run this `compile.py` script
 """
 
 if __name__ == "__main__":
-
     # command-line arguments
     parser = ArgumentParser(description=desc)
-    parser.add_argument("path",
-                        help="Path to Python source containing desired kernel in its scope. File will be executed.")
-    parser.add_argument("--kernel-name", "-n", type=str, default="", help="Name of the kernel to compile",
-                        required=True)
+    parser.add_argument(
+        "path", help="Path to Python source containing desired kernel in its scope. File will be executed."
+    )
+    parser.add_argument(
+        "--kernel-name", "-n", type=str, default="", help="Name of the kernel to compile", required=True
+    )
     parser.add_argument("--num-warps", "-w", type=int, default=1, help="Number of warps to launch the kernel")
-    parser.add_argument("--num-stages", "-ns", type=int, default=3,
-                        help="Number of stages (meta-parameter of the kernel)")
+    parser.add_argument(
+        "--num-stages", "-ns", type=int, default=3, help="Number of stages (meta-parameter of the kernel)"
+    )
     parser.add_argument("--out-name", "-on", type=str, default=None, help="Out name for the compiled kernel")
     parser.add_argument("--out-path", "-o", type=Path, default=None, help="Out filename")
     parser.add_argument("--signature", "-s", type=str, help="Signature of the kernel", required=True)
@@ -91,14 +93,14 @@ if __name__ == "__main__":
             pass
         return None
 
-    hints = {(i, ): constexpr(s.split(":")[1]) for i, s in enumerate(signature) if ":" in s}
+    hints = {(i,): constexpr(s.split(":")[1]) for i, s in enumerate(signature) if ":" in s}
     hints = {k: v for k, v in hints.items() if v is not None}
     constants = {kernel.arg_names[i]: constexpr(s) for i, s in enumerate(signature)}
     constants = {k: v for k, v in constants.items() if v is not None}
     signature = {kernel.arg_names[i]: s.split(":")[0] for i, s in enumerate(signature)}
     for key in constants:
-        signature[key] = 'constexpr'
-    const_sig = 'x'.join([str(v) for v in constants.values()])
+        signature[key] = "constexpr"
+    const_sig = "x".join([str(v) for v in constants.values()])
     doc_string = [f"{k}={v}" for k, v in constants.items()]
     doc_string += [f"num_warps={args.num_warps}", f"num_stages={args.num_stages}"]
 
@@ -124,13 +126,13 @@ if __name__ == "__main__":
             arg_types.append(signature[arg_name])
             arg_names_not_1.append(arg_name)
             arg_types_not_1.append(signature[arg_name])
-        elif (i, ) in attrs.equal_to_1:
+        elif (i,) in attrs.equal_to_1:
             arg_names.append(arg_name)
             arg_types.append(signature[arg_name])
 
     # dump C stub code
     suffix = kernel_suffix(signature.values(), attrs)
-    func_name = '_'.join([out_name, sig_hash, suffix])
+    func_name = "_".join([out_name, sig_hash, suffix])
     hex_ = str(binascii.hexlify(ccinfo.asm["cubin"]))[2:-1]
     params = {
         "kernel_name": func_name,
@@ -144,13 +146,13 @@ if __name__ == "__main__":
         "kernel_docstring": doc_string,
         "shared": ccinfo.metadata.shared,
         "num_warps": args.num_warps,
-        "algo_info": '_'.join([const_sig, meta_sig]),
+        "algo_info": "_".join([const_sig, meta_sig]),
         "gridX": grid[0],
         "gridY": grid[1],
         "gridZ": grid[2],
         "_placeholder": "",
     }
-    for ext in ['h', 'c']:
+    for ext in ["h", "c"]:
         template_path = Path(__file__).parent / f"compile.{ext}"
         with out_path.with_suffix(f".{sig_hash}_{suffix}.{ext}").open("w") as fp:
             fp.write(Path(template_path).read_text().format(**params))

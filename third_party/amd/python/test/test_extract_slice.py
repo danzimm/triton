@@ -18,7 +18,6 @@ else:
 
 
 class BlockedLayout:
-
     def __init__(self, size_per_thread, threads_per_warp, warps_per_cta, order, ctas_per_cga, cta_split_num, cta_order):
         self.sz_per_thread = size_per_thread
         self.threads_per_warp = threads_per_warp
@@ -52,13 +51,16 @@ blocked_layout = [
 ]
 
 
-@pytest.mark.parametrize("M, N, M_tile_size, N_tile_size, M_tile_offset, N_tile_offset",
-                         [[256, 256, 256, 32, 0, 32], [128, 128, 128, 64, 0, 64]])
+@pytest.mark.parametrize(
+    "M, N, M_tile_size, N_tile_size, M_tile_offset, N_tile_offset",
+    [[256, 256, 256, 32, 0, 32], [128, 128, 128, 64, 0, 64]],
+)
 @pytest.mark.parametrize("dtype", [torch.float16])
 @pytest.mark.parametrize("extract_layout", extract_layout)
 @pytest.mark.parametrize("blocked_layout", blocked_layout)
-def test_extract_slice(dtype, M, N, M_tile_size, N_tile_size, M_tile_offset, N_tile_offset, blocked_layout,
-                       extract_layout, device='cuda'):
+def test_extract_slice(
+    dtype, M, N, M_tile_size, N_tile_size, M_tile_offset, N_tile_offset, blocked_layout, extract_layout, device="cuda"
+):
     if not is_hip():
         pytest.skip("extract_slice is AMD specific instruction.")
 
@@ -99,7 +101,7 @@ def test_extract_slice(dtype, M, N, M_tile_size, N_tile_size, M_tile_offset, N_t
     }}
     """
     x = torch.randn((M, N), device=device, dtype=torch.float16)
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ttgir') as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ttgir") as f:
         f.write(ir)
         f.flush()
         kernel = triton.compile(f.name)
@@ -107,6 +109,7 @@ def test_extract_slice(dtype, M, N, M_tile_size, N_tile_size, M_tile_offset, N_t
     extract_slice = torch.empty((M_tile_size, N_tile_size), device=device, dtype=torch.float16)
 
     kernel[(1, 1, 1)](x.data_ptr(), extract_slice)
-    test_result = torch.equal(x[M_tile_offset:M_tile_size + M_tile_offset, N_tile_offset:N_tile_offset + N_tile_size],
-                              extract_slice)
+    test_result = torch.equal(
+        x[M_tile_offset : M_tile_size + M_tile_offset, N_tile_offset : N_tile_offset + N_tile_size], extract_slice
+    )
     assert test_result

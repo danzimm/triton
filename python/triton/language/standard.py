@@ -165,8 +165,9 @@ def _elementwise_max(a, b):
 
 @core._tensor_member_fn
 @jit
-@core._add_reduction_docstr("maximum", return_indices_arg="return_indices",
-                            tie_break_arg="return_indices_tie_break_left")
+@core._add_reduction_docstr(
+    "maximum", return_indices_arg="return_indices", tie_break_arg="return_indices_tie_break_left"
+)
 def max(input, axis=None, return_indices=False, return_indices_tie_break_left=True, keep_dims=False):
     input = core._promote_bfloat16_to_float32(input)
     if return_indices:
@@ -224,8 +225,9 @@ def _elementwise_min(a, b):
 
 @core._tensor_member_fn
 @jit
-@core._add_reduction_docstr("minimum", return_indices_arg="return_indices",
-                            tie_break_arg="return_indices_tie_break_left")
+@core._add_reduction_docstr(
+    "minimum", return_indices_arg="return_indices", tie_break_arg="return_indices_tie_break_left"
+)
 def min(input, axis=None, return_indices=False, return_indices_tie_break_left=True, keep_dims=False):
     input = core._promote_bfloat16_to_float32(input)
     if return_indices:
@@ -322,7 +324,7 @@ def cumprod(input, axis=0, reverse=False):
 @jit
 def _compare_and_swap(x, flip, i: core.constexpr, n_dims: core.constexpr):
     n_outer: core.constexpr = x.numel >> n_dims
-    shape: core.constexpr = [n_outer * 2**i, 2, 2**(n_dims - i - 1)]
+    shape: core.constexpr = [n_outer * 2**i, 2, 2 ** (n_dims - i - 1)]
     y = core.reshape(x, shape)
     # slice left/right with 'stride' 2**(n_dims - i - 1)
     mask = core.arange(0, 2)[None, :, None]
@@ -341,11 +343,11 @@ def _compare_and_swap(x, flip, i: core.constexpr, n_dims: core.constexpr):
 
 @jit
 def _bitonic_merge(x, stage: core.constexpr, order: core.constexpr, n_dims: core.constexpr):
-    '''
+    """
     order_type 0 == ascending
     order_type 1 == descending
     order_type 2 == alternating
-    '''
+    """
     n_outer: core.constexpr = x.numel >> n_dims
     core.static_assert(stage <= n_dims)
     # flip denotes whether to re-arrange sub-sequences of elements in ascending or
@@ -354,7 +356,7 @@ def _bitonic_merge(x, stage: core.constexpr, order: core.constexpr, n_dims: core
     # if flip = 00110011... then all the elements will be re-arranged alternatingly (with
     # a stride of 2) at this stage
     if order == 2:
-        shape: core.constexpr = [n_outer * 2**(n_dims - 1 - stage), 2, 2**stage]
+        shape: core.constexpr = [n_outer * 2 ** (n_dims - 1 - stage), 2, 2**stage]
         flip = core.reshape(core.broadcast_to(core.arange(0, 2)[None, :, None], shape), x.shape)
     else:
         flip = order
@@ -420,7 +422,7 @@ def flip(x, dim=None):
     idtype = core.get_int_dtype(bitwidth=x.dtype.primitive_bitwidth, signed=True)
     y = core.reshape(x.to(idtype, bitcast=True), [2] * steps)
     y = core.expand_dims(y, start)
-    flip = (core.arange(0, 2)[:, None] == 1 - core.arange(0, 2))
+    flip = core.arange(0, 2)[:, None] == 1 - core.arange(0, 2)
     for i in core.static_range(start, steps):
         flip2 = flip
         for j in core.static_range(0, steps + 1):

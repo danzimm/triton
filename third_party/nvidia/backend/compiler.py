@@ -17,7 +17,6 @@ import sysconfig
 
 
 def min_dot_size(target: GPUTarget):
-
     def check_dot_compatibility(lhs_type, rhs_type) -> Tuple[int, int, int]:  # [m, n, k]
         lhs_bitwidth = lhs_type.scalar.primitive_bitwidth
         rhs_bitwidth = rhs_type.scalar.primitive_bitwidth
@@ -56,11 +55,11 @@ def get_ptxas_version():
 
 @functools.lru_cache()
 def ptx_get_version(cuda_version) -> int:
-    '''
+    """
     Get the highest PTX version supported by the current CUDA driver.
-    '''
+    """
     assert isinstance(cuda_version, str)
-    major, minor = map(int, cuda_version.split('.'))
+    major, minor = map(int, cuda_version.split("."))
     if major == 12:
         if minor < 6:
             return 80 + minor
@@ -91,7 +90,7 @@ def get_features(options):
     # and run a test.  If it's not supported, LLVM will print a warning
     # like "+ptx8.4 is not a recognized feature for this target".
     llvm_ptx_version = min(83, ptx_version)
-    features = f'+ptx{llvm_ptx_version}'
+    features = f"+ptx{llvm_ptx_version}"
     return features
 
 
@@ -120,17 +119,16 @@ class CUDAOptions:
     max_num_imprecise_acc_default: bool = None
     extern_libs: dict = None
     debug: bool = False
-    backend_name: str = 'cuda'
+    backend_name: str = "cuda"
     sanitize_overflow: bool = True
 
     def __post_init__(self):
-        default_libdir = Path(__file__).parent / 'lib'
+        default_libdir = Path(__file__).parent / "lib"
         extern_libs = {} if self.extern_libs is None else dict(self.extern_libs)
-        if not extern_libs.get('libdevice', None):
-            extern_libs['libdevice'] = os.getenv("TRITON_LIBDEVICE_PATH", str(default_libdir / 'libdevice.10.bc'))
-        object.__setattr__(self, 'extern_libs', tuple(extern_libs.items()))
-        assert self.num_warps > 0 and (self.num_warps & (self.num_warps - 1)) == 0, \
-               "num_warps must be a power of 2"
+        if not extern_libs.get("libdevice", None):
+            extern_libs["libdevice"] = os.getenv("TRITON_LIBDEVICE_PATH", str(default_libdir / "libdevice.10.bc"))
+        object.__setattr__(self, "extern_libs", tuple(extern_libs.items()))
+        assert self.num_warps > 0 and (self.num_warps & (self.num_warps - 1)) == 0, "num_warps must be a power of 2"
 
     def hash(self):
         hash_dict = dict(self.__dict__)
@@ -140,10 +138,9 @@ class CUDAOptions:
 
 
 class CUDABackend(BaseBackend):
-
     @staticmethod
     def supports_target(target: GPUTarget):
-        return target.backend == 'cuda'
+        return target.backend == "cuda"
 
     def __init__(self, target: GPUTarget) -> None:
         super().__init__(target)
@@ -161,7 +158,7 @@ class CUDABackend(BaseBackend):
 
         if "deprecated_fp8_dtypes" not in args:
             if self.capability >= 90:
-                args["deprecated_fp8_dtypes"] = ("fp8e4b15", )
+                args["deprecated_fp8_dtypes"] = ("fp8e4b15",)
 
         if "enable_fp_fusion" not in args:
             args["enable_fp_fusion"] = os.getenv("TRITON_DEFAULT_FP_FUSION", "1") == "1"
@@ -180,15 +177,18 @@ class CUDABackend(BaseBackend):
 
     def get_codegen_implementation(self):
         import triton.language.extra.cuda as cuda
+
         codegen_fns = {
-            "convert_custom_types":
-            cuda.convert_custom_float8_sm80 if self.capability >= 80 else cuda.convert_custom_float8_sm70,
-            "min_dot_size": min_dot_size(self.target)
+            "convert_custom_types": cuda.convert_custom_float8_sm80
+            if self.capability >= 80
+            else cuda.convert_custom_float8_sm70,
+            "min_dot_size": min_dot_size(self.target),
         }
         return codegen_fns
 
     def get_module_map(self) -> Dict[str, ModuleType]:
         from triton.language.extra.cuda import libdevice
+
         return {"triton.language.extra.libdevice": libdevice}
 
     def load_dialects(self, ctx):
@@ -292,9 +292,9 @@ class CUDABackend(BaseBackend):
         context = llvm.context()
 
         llvm_mod = llvm.to_module(mod, context)
-        proc = 'sm_90a' if capability == 90 else f'sm_{capability}'
+        proc = "sm_90a" if capability == 90 else f"sm_{capability}"
         features = get_features(options)
-        triple = 'nvptx64-nvidia-cuda'
+        triple = "nvptx64-nvidia-cuda"
         llvm.attach_datalayout(llvm_mod, triple, proc, features)
         nvidia.set_nvvm_reflect_ftz(llvm_mod)
 
@@ -323,17 +323,17 @@ class CUDABackend(BaseBackend):
     def make_ptx(src, metadata, opt, capability):
         ptx_version = get_ptx_version_from_options(opt)
 
-        triple = 'nvptx64-nvidia-cuda'
-        proc = 'sm_90a' if capability == 90 else f'sm_{capability}'
+        triple = "nvptx64-nvidia-cuda"
+        proc = "sm_90a" if capability == 90 else f"sm_{capability}"
         features = get_features(opt)
-        ret = llvm.translate_to_asm(src, triple, proc, features, ['nvptx-short-ptr'], opt.enable_fp_fusion, False)
+        ret = llvm.translate_to_asm(src, triple, proc, features, ["nvptx-short-ptr"], opt.enable_fp_fusion, False)
         # Find kernel names (there should only be one)
         names = re.findall(r".visible .entry ([a-zA-Z_][a-zA-Z0-9_]*)", ret)
         assert len(names) == 1
         metadata["name"] = names[0]
         # post-process
-        ptx_version = f'{ptx_version//10}.{ptx_version%10}'
-        ret = re.sub(r'\.version \d+\.\d+', f'.version {ptx_version}', ret, flags=re.MULTILINE)
+        ptx_version = f"{ptx_version//10}.{ptx_version%10}"
+        ret = re.sub(r"\.version \d+\.\d+", f".version {ptx_version}", ret, flags=re.MULTILINE)
         # Remove the debug flag that prevents ptxas from optimizing the code
         ret = re.sub(r",\s*debug|debug,\s*", "", ret)
         if os.environ.get("NVPTX_ENABLE_DUMP", "0") == "1":
@@ -344,18 +344,28 @@ class CUDABackend(BaseBackend):
     @staticmethod
     def make_cubin(src, metadata, opt, capability):
         ptxas, _ = _path_to_binary("ptxas")
-        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.ptx') as fsrc, \
-            tempfile.NamedTemporaryFile(delete=False, mode='r', suffix='.log') as flog:
+        with (
+            tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".ptx") as fsrc,
+            tempfile.NamedTemporaryFile(delete=False, mode="r", suffix=".log") as flog,
+        ):
             fsrc.write(src)
             fsrc.flush()
-            fbin = fsrc.name + '.o'
+            fbin = fsrc.name + ".o"
 
-            line_info = [] if os.environ.get('TRITON_DISABLE_LINE_INFO') else ['-lineinfo']
-            fmad = [] if opt.enable_fp_fusion else ['--fmad=false']
-            suffix = 'a' if capability == 90 else ''
-            opt_level = ['--opt-level', '0'] if os.environ.get("DISABLE_PTXAS_OPT", "0") == "1" else []
+            line_info = [] if os.environ.get("TRITON_DISABLE_LINE_INFO") else ["-lineinfo"]
+            fmad = [] if opt.enable_fp_fusion else ["--fmad=false"]
+            suffix = "a" if capability == 90 else ""
+            opt_level = ["--opt-level", "0"] if os.environ.get("DISABLE_PTXAS_OPT", "0") == "1" else []
             ptxas_cmd = [
-                ptxas, *line_info, *fmad, '-v', *opt_level, f'--gpu-name=sm_{capability}{suffix}', fsrc.name, '-o', fbin
+                ptxas,
+                *line_info,
+                *fmad,
+                "-v",
+                *opt_level,
+                f"--gpu-name=sm_{capability}{suffix}",
+                fsrc.name,
+                "-o",
+                fbin,
             ]
             try:
                 subprocess.run(ptxas_cmd, check=True, close_fds=False, stderr=flog)
@@ -370,17 +380,15 @@ class CUDABackend(BaseBackend):
                     os.remove(flog.name)
 
                 if e.returncode == 255:
-                    error = 'Internal Triton PTX codegen error'
+                    error = "Internal Triton PTX codegen error"
                 elif e.returncode == 128 + signal.SIGSEGV:
-                    error = '`ptxas` raised SIGSEGV'
+                    error = "`ptxas` raised SIGSEGV"
                 else:
-                    error = f'`ptxas` failed with error code {e.returncode}'
+                    error = f"`ptxas` failed with error code {e.returncode}"
 
-                raise PTXASError(f"{error}\n"
-                                 f"`ptxas` stderr:\n{log}\n"
-                                 f'Repro command: {" ".join(ptxas_cmd)}\n')
+                raise PTXASError(f"{error}\n" f"`ptxas` stderr:\n{log}\n" f'Repro command: {" ".join(ptxas_cmd)}\n')
 
-            with open(fbin, 'rb') as f:
+            with open(fbin, "rb") as f:
                 cubin = f.read()
             if os.path.exists(fbin):
                 os.remove(fbin)
@@ -396,4 +404,4 @@ class CUDABackend(BaseBackend):
     @functools.lru_cache()
     def hash(self):
         version = get_ptxas_version()
-        return f'{version}-{self.capability}'
+        return f"{version}-{self.capability}"

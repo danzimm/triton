@@ -16,7 +16,8 @@ include_dir = [os.path.join(dirname, "include")]
 
 def _find_already_mmapped_dylib_on_linux(lib_name):
     import platform
-    if platform.system() != 'Linux':
+
+    if platform.system() != "Linux":
         return None
 
     # Use dl_iterate_phdr to walk through the list of shared libraries at runtime.
@@ -27,8 +28,8 @@ def _find_already_mmapped_dylib_on_linux(lib_name):
 
     class DlPhdrInfo(ctypes.Structure):
         _fields_ = [
-            ('dlpi_addr', c_void_p),
-            ('dlpi_name', c_char_p),
+            ("dlpi_addr", c_void_p),
+            ("dlpi_name", c_char_p),
             # We don't care about the remaining fields.
         ]
 
@@ -37,7 +38,7 @@ def _find_already_mmapped_dylib_on_linux(lib_name):
 
     # Load libc and get the dl_iterate_phdr symbol.
     try:
-        dl_iterate_phdr = ctypes.CDLL('libc.so.6').dl_iterate_phdr
+        dl_iterate_phdr = ctypes.CDLL("libc.so.6").dl_iterate_phdr
     except (OSError, AttributeError):
         return None
     # argtypes must use c_char_p to accept create_string_buffer.
@@ -83,6 +84,7 @@ def _get_path_to_hip_runtime_dylib():
     paths = []
 
     import site
+
     # First search the HIP runtime dynamic library packaged with PyTorch. It's very likely
     # that we run Triton together with PyTorch. This makes sure we use the same dynamic
     # library to avoid version mismatch.
@@ -117,7 +119,7 @@ def _get_path_to_hip_runtime_dylib():
         paths.append(loc)
 
     # As a last resort, guess if we have it in some common installation path.
-    common_install_path = os.path.join('/opt/rocm/lib/', lib_name)
+    common_install_path = os.path.join("/opt/rocm/lib/", lib_name)
     if os.path.exists(common_install_path):
         return common_install_path
     paths.append(common_install_path)
@@ -138,6 +140,7 @@ def compile_module_from_src(src, name):
             with open(so, "rb") as f:
                 cache_path = cache.put(f.read(), f"{name}.so", binary=True)
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(name, cache_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -145,7 +148,6 @@ def compile_module_from_src(src, name):
 
 
 class HIPUtils(object):
-
     def __new__(cls):
         if not hasattr(cls, "instance"):
             cls.instance = super(HIPUtils, cls).__new__(cls)
@@ -157,7 +159,7 @@ class HIPUtils(object):
         # Just do a simple search and replace here instead of templates or format strings.
         # This way we don't need to escape-quote C code curly brackets and we can replace
         # exactly once.
-        src = src.replace('/*py_libhip_search_path*/', libhip_path, 1)
+        src = src.replace("/*py_libhip_search_path*/", libhip_path, 1)
         mod = compile_module_from_src(src, "hip_utils")
         self.load_binary = mod.load_binary
         self.get_device_properties = mod.get_device_properties
@@ -165,7 +167,7 @@ class HIPUtils(object):
 
 # -------------------- Launcher ----------------------------
 def ty_to_cpp(ty):
-    if ty[0] == '*' or ty == "none":
+    if ty[0] == "*" or ty == "none":
         return "hipDeviceptr_t"
     return {
         "i1": "int32_t",
@@ -187,15 +189,14 @@ def ty_to_cpp(ty):
 
 
 def make_launcher(constants, signature, ids, warp_size):
-
     def _extracted_type(ty):
-        if ty[0] == '*' or ty == "none":
+        if ty[0] == "*" or ty == "none":
             return "PyObject*"
-        if ty[0] == '[':
+        if ty[0] == "[":
             if ty == "[]":
                 return "[]"
             tys = parse_list_string(ty)
-            val = ','.join(map(_extracted_type, tys))
+            val = ",".join(map(_extracted_type, tys))
             return f"[{val}]"
         return ty_to_cpp(ty)
 
@@ -206,7 +207,7 @@ def make_launcher(constants, signature, ids, warp_size):
             if ty == "[]":
                 return "()"
             tys = parse_list_string(ty)
-            val = ''.join(map(format_of, tys))
+            val = "".join(map(format_of, tys))
             return f"({val})"
         return {
             "PyObject*": "O",
@@ -223,16 +224,16 @@ def make_launcher(constants, signature, ids, warp_size):
             "uint64_t": "K",
         }[ty]
 
-    signature = {k: v for k, v in signature.items() if v != 'constexpr'}
-    args_format = ''.join([format_of(_extracted_type(ty)) for ty in signature.values()])
+    signature = {k: v for k, v in signature.items() if v != "constexpr"}
+    args_format = "".join([format_of(_extracted_type(ty)) for ty in signature.values()])
     format = "iiiKKOOOO" + args_format
-    signature = ','.join(signature.values()).replace('[', '').replace(']', '')
-    signature = list(filter(bool, signature.split(',')))
+    signature = ",".join(signature.values()).replace("[", "").replace("]", "")
+    signature = list(filter(bool, signature.split(",")))
     signature = {i: s for i, s in enumerate(signature)}
-    args_list = ', ' + ', '.join(f"&_arg{i}" for i, ty in signature.items()) if len(signature) > 0 else ''
+    args_list = ", " + ", ".join(f"&_arg{i}" for i, ty in signature.items()) if len(signature) > 0 else ""
     # Record the end of regular arguments;
     # subsequent arguments are architecture-specific descriptors, such as tensor descriptors for CUDA.
-    arg_decls = ', '.join(f"{ty_to_cpp(ty)} arg{i}" for i, ty in signature.items())
+    arg_decls = ", ".join(f"{ty_to_cpp(ty)} arg{i}" for i, ty in signature.items())
 
     libhip_path = _get_path_to_hip_runtime_dylib()
 
@@ -468,7 +469,6 @@ PyMODINIT_FUNC PyInit___triton_launcher(void) {{
 
 
 class HIPLauncher(object):
-
     def __init__(self, src, metadata):
         ids = {"ids_of_const_exprs": src.fn.constexprs if hasattr(src, "fn") else tuple()}
         constants = src.constants if hasattr(src, "constants") else dict()
@@ -483,7 +483,6 @@ class HIPLauncher(object):
 
 
 class HIPDriver(GPUDriver):
-
     def __init__(self):
         super().__init__()
         self.utils = HIPUtils()
@@ -491,27 +490,31 @@ class HIPDriver(GPUDriver):
 
     def get_device_interface(self):
         import torch
+
         return torch.cuda
 
     @staticmethod
     def is_active():
         import torch
+
         return torch.version.hip is not None
 
     def get_current_target(self):
         device = self.get_current_device()
         device_properties = self.utils.get_device_properties(device)
-        arch = device_properties['arch']
-        warp_size = device_properties['warpSize']
-        return GPUTarget("hip", arch.split(':')[0], warp_size)
+        arch = device_properties["arch"]
+        warp_size = device_properties["warpSize"]
+        return GPUTarget("hip", arch.split(":")[0], warp_size)
 
     def get_active_torch_device(self):
         import torch
+
         # when using hip devices, the device string in pytorch is "cuda"
         return torch.device("cuda", self.get_current_device())
 
     def get_benchmarker(self):
         from triton.testing import do_bench
+
         return do_bench
 
     def get_empty_cache_for_benchmark(self):
@@ -519,4 +522,4 @@ class HIPDriver(GPUDriver):
 
         # It's the same as the Nvidia backend.
         cache_size = 256 * 1024 * 1024
-        return torch.empty(int(cache_size // 4), dtype=torch.int, device='cuda')
+        return torch.empty(int(cache_size // 4), dtype=torch.int, device="cuda")

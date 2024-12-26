@@ -1,9 +1,10 @@
-from . import core
-from . import semantic
 from functools import wraps
 from typing import List
 
-T = core.TypeVar('T')
+from . import core, semantic
+
+
+T = core.TypeVar("T")
 
 
 def _check_dtype(dtypes: List[str]) -> T:
@@ -16,7 +17,6 @@ def _check_dtype(dtypes: List[str]) -> T:
     """
 
     def wrapper(fn):
-
         @wraps(fn)
         def check(*args, **kwargs):
             # concatenate args and kwargs
@@ -32,7 +32,6 @@ def _check_dtype(dtypes: List[str]) -> T:
 
 
 def _add_math_1arg_docstr(name: str) -> core.Callable[[T], T]:
-
     def _decorator(func: T) -> T:
         docstr = """
     Computes the element-wise {name} of :code:`x`.
@@ -47,7 +46,6 @@ def _add_math_1arg_docstr(name: str) -> core.Callable[[T], T]:
 
 
 def _add_math_2arg_docstr(name: str) -> core.Callable[[T], T]:
-
     def _decorator(func: T) -> T:
         docstr = """
     Computes the element-wise {name} of :code:`x` and :code:`y`.
@@ -64,7 +62,6 @@ def _add_math_2arg_docstr(name: str) -> core.Callable[[T], T]:
 
 
 def _add_math_3arg_docstr(name: str) -> core.Callable[[T], T]:
-
     def _decorator(func: T) -> T:
         docstr = """
     Computes the element-wise {name} of :code:`x`, :code:`y`, and :code:`z`.

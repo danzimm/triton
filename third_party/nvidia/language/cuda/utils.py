@@ -3,14 +3,16 @@ from triton.language import core
 
 @core.extern
 def globaltimer(_builder=None):
-    return core.inline_asm_elementwise("mov.u64 $0, %globaltimer;", "=l", [], dtype=core.int64, is_pure=False, pack=1,
-                                       _builder=_builder)
+    return core.inline_asm_elementwise(
+        "mov.u64 $0, %globaltimer;", "=l", [], dtype=core.int64, is_pure=False, pack=1, _builder=_builder
+    )
 
 
 @core.extern
 def smid(_builder=None):
-    return core.inline_asm_elementwise("mov.u32 $0, %smid;", "=r", [], dtype=core.int32, is_pure=True, pack=1,
-                                       _builder=_builder)
+    return core.inline_asm_elementwise(
+        "mov.u32 $0, %smid;", "=r", [], dtype=core.int32, is_pure=True, pack=1, _builder=_builder
+    )
 
 
 @core.builtin
@@ -43,8 +45,14 @@ def convert_fp8e4b15_to_float16(arg, _builder=None):
         "add.u32 b1, b1, a1;                    \n"
         "lop3.b32 $0, b0, 0x80008000, a0, 0xf8; \n"
         "shl.b32 $1, b1, 7;                     \n"
-        "}                                      \n", "=r,=r,r", [arg], dtype=core.float16, is_pure=True, pack=4,
-        _builder=_builder)
+        "}                                      \n",
+        "=r,=r,r",
+        [arg],
+        dtype=core.float16,
+        is_pure=True,
+        pack=4,
+        _builder=_builder,
+    )
 
 
 @core.builtin
@@ -79,8 +87,9 @@ def convert_float16_to_fp8e4b15(arg, has_minx2, _builder=None):
               lop3.b32 b1, $2, 0x80008000, a1, 0xea;
               prmt.b32 $0, b0, b1, 0x7531;
               }"""
-    return core.inline_asm_elementwise(asm, "=r,r,r", [arg], dtype=core.float8e4b15, is_pure=True, pack=4,
-                                       _builder=_builder)
+    return core.inline_asm_elementwise(
+        asm, "=r,r,r", [arg], dtype=core.float8e4b15, is_pure=True, pack=4, _builder=_builder
+    )
 
 
 @core.builtin

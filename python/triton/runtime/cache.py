@@ -26,7 +26,6 @@ def default_dump_dir():
 
 
 class CacheManager(ABC):
-
     def __init__(self, key):
         pass
 
@@ -48,7 +47,6 @@ class CacheManager(ABC):
 
 
 class FileCacheManager(CacheManager):
-
     def __init__(self, key, override=False, dump=False):
         self.key = key
         self.lock_path = None
@@ -154,9 +152,9 @@ class RemoteCacheBackend:
 
 
 class RedisRemoteCacheBackend(RemoteCacheBackend):
-
     def __init__(self, key):
         import redis
+
         self._key = key
         self._key_fmt = os.environ.get("TRITON_REDIS_KEY_FORMAT", "triton:{key}:{filename}")
         self._redis = redis.Redis(
@@ -176,7 +174,6 @@ class RedisRemoteCacheBackend(RemoteCacheBackend):
 
 
 class RemoteCacheManager(CacheManager):
-
     def __init__(self, key, override=False, dump=False):
         # Setup backend pointed too by `TRITON_REMOTE_CACHE_BACKEND`.
         remote_cache_manager = os.environ["TRITON_REMOTE_CACHE_BACKEND"]
@@ -206,7 +203,7 @@ class RemoteCacheManager(CacheManager):
         results = self._backend.get([filename])
         if len(results) == 0:
             return None
-        (_, data), = results.items()
+        ((_, data),) = results.items()
         return self._materialize(filename, data)
 
     def put(self, data, filename: str, binary=True) -> str:
@@ -287,7 +284,7 @@ def get_dump_manager(key) -> CacheManager:
 
 def make_so_cache_key(version_hash, signature, constants, ids, **kwargs):
     # Get unique key for the compiled code
-    signature = {k: 'ptr' if v[0] == '*' else v for k, v in signature.items()}
+    signature = {k: "ptr" if v[0] == "*" else v for k, v in signature.items()}
     key = f"{version_hash}-{''.join(signature.values())}-{constants}-{ids}"
     for kw in kwargs:
         key = f"{key}-{kwargs.get(kw)}"

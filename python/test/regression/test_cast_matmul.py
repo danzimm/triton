@@ -31,13 +31,25 @@ out_dtypes = ["float16", "float32"]
 
 
 @triton.jit
-def matmul_kernel(A, B, C, M, N, K,  #
-                  stride_am, stride_ak,  #
-                  stride_bk, stride_bn,  #
-                  stride_cm, stride_cn,  #
-                  dot_out_dtype: tl.constexpr,  #
-                  BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr,  #
-                  BLOCK_K: tl.constexpr, GROUP_M: tl.constexpr):
+def matmul_kernel(
+    A,
+    B,
+    C,
+    M,
+    N,
+    K,  #
+    stride_am,
+    stride_ak,  #
+    stride_bk,
+    stride_bn,  #
+    stride_cm,
+    stride_cn,  #
+    dot_out_dtype: tl.constexpr,  #
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,  #
+    BLOCK_K: tl.constexpr,
+    GROUP_M: tl.constexpr,
+):
     # matrix multiplication
     pid = tl.program_id(0)
     grid_m = tl.cdiv(M, BLOCK_M)
@@ -77,14 +89,18 @@ def matmul_kernel(A, B, C, M, N, K,  #
     tl.store(C, acc, mask=mask)
 
 
-@pytest.mark.parametrize("M, K, N, BLOCK_K, BLOCK_M, w_dtype, x_dtype, out_dtype",
-                         [(M, K, N, BLOCK_K, BLOCK_M, w, x, o)  #
-                          for BLOCK_K in [16, 32]  #
-                          for BLOCK_M in [16, 64]  #
-                          for (M, K, N) in [(128, 128, 128), (768, 768, 1024)]  #
-                          for w in input_dtypes
-                          for x in input_dtypes  #
-                          for o in out_dtypes])
+@pytest.mark.parametrize(
+    "M, K, N, BLOCK_K, BLOCK_M, w_dtype, x_dtype, out_dtype",
+    [
+        (M, K, N, BLOCK_K, BLOCK_M, w, x, o)  #
+        for BLOCK_K in [16, 32]  #
+        for BLOCK_M in [16, 64]  #
+        for (M, K, N) in [(128, 128, 128), (768, 768, 1024)]  #
+        for w in input_dtypes
+        for x in input_dtypes  #
+        for o in out_dtypes
+    ],
+)
 def test_cast_matmul(M, K, N, BLOCK_K, BLOCK_M, w_dtype, x_dtype, out_dtype):
     if x_dtype == w_dtype:
         pytest.skip("skip the same input dtype")
@@ -116,13 +132,23 @@ def test_cast_matmul(M, K, N, BLOCK_K, BLOCK_M, w_dtype, x_dtype, out_dtype):
     grid = ((triton.cdiv(M, block_m) * triton.cdiv(N, block_n)), 1)
 
     matmul_kernel[grid](
-        a, b, out_triton, M, N, K,  #
-        a.stride(0), a.stride(1),  #
-        b.stride(0), b.stride(1),  #
-        out_triton.stride(0), out_triton.stride(1), dot_out_dtype=triton_dtype,  #
+        a,
+        b,
+        out_triton,
+        M,
+        N,
+        K,  #
+        a.stride(0),
+        a.stride(1),  #
+        b.stride(0),
+        b.stride(1),  #
+        out_triton.stride(0),
+        out_triton.stride(1),
+        dot_out_dtype=triton_dtype,  #
         GROUP_M=8,  #
         BLOCK_M=block_m,  #
         BLOCK_N=block_n,  #
-        BLOCK_K=block_k)
+        BLOCK_K=block_k,
+    )
 
     torch.testing.assert_close(out_torch, out_triton, atol=0.3, rtol=0.01)

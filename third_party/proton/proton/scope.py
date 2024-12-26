@@ -34,8 +34,12 @@ class scope:
         metrics (dict[str, float], optional): The metrics of the scope. Default is None.
     """
 
-    def __init__(self, name: str, metrics: Optional[dict[str, MetricValueType]] = None,
-                 properties: Optional[dict[str, PropertyValueType]] = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        metrics: Optional[dict[str, MetricValueType]] = None,
+        properties: Optional[dict[str, PropertyValueType]] = None,
+    ) -> None:
         self.name = name
         self.metrics = metrics
         self.properties = properties
@@ -57,7 +61,6 @@ class scope:
         libproton.exit_scope(self.id, self.name)
 
     def __call__(self, func):
-
         @wraps(func)
         def wrapper(*args, **kwargs):
             if get_profiling_on():
@@ -75,8 +78,13 @@ class scope:
         return wrapper
 
 
-def enter_scope(name: str, *, triton_op: bool = False, metrics: Optional[dict[str, MetricValueType]] = None,
-                properties: Optional[dict[str, PropertyValueType]] = None) -> int:
+def enter_scope(
+    name: str,
+    *,
+    triton_op: bool = False,
+    metrics: Optional[dict[str, MetricValueType]] = None,
+    properties: Optional[dict[str, PropertyValueType]] = None,
+) -> int:
     if not get_profiling_on():
         return -1
     id = libproton.record_scope()

@@ -5,12 +5,11 @@ import os
 
 
 def is_interpreter():
-    return os.environ.get('TRITON_INTERPRET', '0') == '1'
+    return os.environ.get("TRITON_INTERPRET", "0") == "1"
 
 
 def is_cuda():
-    return not is_interpreter() and \
-        triton.runtime.driver.active.get_current_target().backend == "cuda"
+    return not is_interpreter() and triton.runtime.driver.active.get_current_target().backend == "cuda"
 
 
 @pytest.mark.parametrize("m, n, k", [(16, 16, 16), (32, 16, 16), (16, 32, 16), (16, 16, 32)])
@@ -29,7 +28,7 @@ def test_cublas(m, n, k, dtype_str, device):
 
     def limited_rand(elements, shape):
         total_elems = torch.prod(torch.tensor(shape)).item()
-        indices = torch.randint(0, len(elements), (total_elems, ), device=device)
+        indices = torch.randint(0, len(elements), (total_elems,), device=device)
         return elements[indices].view(shape)
 
     elements = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0], dtype=torch.float32, device=device)

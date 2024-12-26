@@ -13,11 +13,13 @@ class TmaDescKernelParam:
         assert self.desc.data_ptr() % 64 == 0
 
         if len(dims) == 1:
-            triton.runtime.driver.active.utils.fill_1d_tma_descriptor(ptr, dims[0], block_dims[0], element_size,
-                                                                      self.desc.data_ptr())
+            triton.runtime.driver.active.utils.fill_1d_tma_descriptor(
+                ptr, dims[0], block_dims[0], element_size, self.desc.data_ptr()
+            )
         else:
-            triton.runtime.driver.active.utils.fill_2d_tma_descriptor(ptr, dims[0], dims[1], block_dims[0],
-                                                                      block_dims[1], element_size, self.desc.data_ptr())
+            triton.runtime.driver.active.utils.fill_2d_tma_descriptor(
+                ptr, dims[0], dims[1], block_dims[0], block_dims[1], element_size, self.desc.data_ptr()
+            )
 
     # Return a CUtensorMap* pointer in host memory
     def tma_desc_cpu_ptr(self):

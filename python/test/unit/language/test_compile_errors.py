@@ -11,7 +11,6 @@ from triton._internal_testing import is_interpreter, is_cuda, is_hip, is_hip_mi3
 
 
 def test_err_undefined_variable():
-
     @triton.jit
     def kernel():
         a += 1  # noqa
@@ -26,7 +25,6 @@ def test_err_undefined_variable():
 
 
 def test_err_in_binary_operator():
-
     @triton.jit
     def kernel():
         0 + "a"
@@ -41,7 +39,6 @@ def test_err_in_binary_operator():
 
 
 def test_err_static_assert():
-
     @triton.jit
     def kernel():
         tl.static_assert(isinstance(0, tl.tensor))
@@ -77,7 +74,6 @@ def test_err_in_unary_op():
 
 
 def test_err_in_binary_op():
-
     @triton.jit
     def kernel():
         1.0 << 1
@@ -100,7 +96,6 @@ def nested_call():
 
 
 def test_err_in_nested_call():
-
     @triton.jit
     def kernel():
         # this is a comment to push nested_call() onto the next line
@@ -122,7 +117,6 @@ def test_err_in_nested_call():
 
 
 def test_err_in_builtin():
-
     # The root error here comes from core.py.  Make sure the stacktrace reflects
     # this.
     @triton.jit
@@ -135,8 +129,9 @@ def test_err_in_builtin():
     try:
         inner = e.value.__cause__
         outer = e.value
-        assert f"{os.sep}core.py" in '\n'.join(traceback.format_tb(
-            inner.__traceback__)), "error should point inside core.py"
+        assert f"{os.sep}core.py" in "\n".join(
+            traceback.format_tb(inner.__traceback__)
+        ), "error should point inside core.py"
 
         assert "at 2:4:" in str(outer), "error should point to expand_dims call"
         assert "<source unavailable>" not in str(outer)
@@ -161,12 +156,11 @@ def test_two_returns_no_err():
 
 
 def test_not_const_annotate_no_err():
-
     @triton.jit
     def kernel(N: int = 1):
         pass
 
-    triton.compile(triton.compiler.ASTSource(fn=kernel, signature={'N': 'i32'}, constexprs={}))
+    triton.compile(triton.compiler.ASTSource(fn=kernel, signature={"N": "i32"}, constexprs={}))
 
 
 @triton.jit
@@ -180,7 +174,6 @@ def returns_branched_on_constexpr(N: tl.constexpr):
 
 
 def test_returns_branched_on_constexpr():
-
     @triton.jit
     def kernel1(N: tl.constexpr):
         a = returns_branched_on_constexpr(N)
@@ -205,13 +198,12 @@ def returns_branched_on_non_constexpr(N: int):
 
 
 def test_returns_branched_on_non_constexpr():
-
     @triton.jit
     def kernel(N: int):
         returns_branched_on_non_constexpr(N)
 
     with pytest.raises(CompilationError) as e:
-        triton.compile(triton.compiler.ASTSource(fn=kernel, signature={'N': 'i32'}, constexprs={}))
+        triton.compile(triton.compiler.ASTSource(fn=kernel, signature={"N": "i32"}, constexprs={}))
 
     try:
         assert "at 2:4:" in str(e.value), "error should point to the function call"
@@ -221,7 +213,6 @@ def test_returns_branched_on_non_constexpr():
 
 
 def test_power_of_two_shapes():
-
     @triton.jit
     def kernel():
         tl.arange(2, 7)
@@ -232,10 +223,9 @@ def test_power_of_two_shapes():
 
 
 def test_power_of_two_shapes_2():
-
     @triton.jit
     def kernel():
-        tl.full((33, ), 0, dtype=tl.int64)
+        tl.full((33,), 0, dtype=tl.int64)
 
     with pytest.raises(CompilationError) as e:
         triton.compile(triton.compiler.ASTSource(fn=kernel, signature={}, constexprs={}))
@@ -243,7 +233,6 @@ def test_power_of_two_shapes_2():
 
 
 def test_captured_var_access():
-
     CAPTURED = 42
 
     @triton.jit
@@ -259,7 +248,6 @@ GLOBAL = 42
 
 
 def test_global_var_access():
-
     @triton.jit
     def kernel():
         a = GLOBAL  # noqa
@@ -273,7 +261,6 @@ CONSTEXPR_ANNOTATED_GLOBAL: tl.constexpr = 42
 
 
 def test_constexpr_annotated_global_var_access():
-
     @triton.jit
     def kernel():
         a = CONSTEXPR_ANNOTATED_GLOBAL  # noqa
@@ -286,7 +273,6 @@ CONSTEXPR_GLOBAL = tl.constexpr(42)
 
 
 def test_constexpr_global_var_access():
-
     @triton.jit
     def kernel():
         a = CONSTEXPR_GLOBAL  # noqa
@@ -299,7 +285,6 @@ TYPE_ALIAS = tl.pointer_type(tl.int32)
 
 
 def test_global_type_alias_access():
-
     @triton.jit
     def kernel():
         a = TYPE_ALIAS  # noqa
@@ -309,31 +294,28 @@ def test_global_type_alias_access():
 
 
 def test_global_access_in_fn_default_arg():
-
     @triton.jit
     def kernel(a=GLOBAL):
         pass
 
     # No error.
-    triton.compile(triton.compiler.ASTSource(fn=kernel, signature={'a': "i32"}, constexprs={}))
+    triton.compile(triton.compiler.ASTSource(fn=kernel, signature={"a": "i32"}, constexprs={}))
 
 
 def test_defaults_assign_no_err():
-
     @triton.jit
     def kernel(a=1, B: tl.constexpr = ""):
         pass
 
-    triton.compile(triton.compiler.ASTSource(fn=kernel, signature={'a': 'i32', 'B': 'constexpr'}, constexprs={'B': ""}))
+    triton.compile(triton.compiler.ASTSource(fn=kernel, signature={"a": "i32", "B": "constexpr"}, constexprs={"B": ""}))
 
 
 def test_where_warning(fresh_triton_cache):
-
     @triton.jit
     def kernel():
-        a = tl.full((64, ), 0, tl.uint32)
-        b = tl.full((64, ), 1, tl.float32)
-        c = tl.full((64, ), 2, tl.float32)
+        a = tl.full((64,), 0, tl.uint32)
+        b = tl.full((64,), 1, tl.float32)
+        c = tl.full((64,), 2, tl.float32)
         tl.where(a, b, c)
 
     with pytest.warns(UserWarning):
@@ -359,7 +341,7 @@ def test_fp8_support(dtype):
 
     @triton.jit
     def dtype_kernel(dtype: tl.constexpr):
-        _ = tl.full((256, ), 0.0, dtype)
+        _ = tl.full((256,), 0.0, dtype)
 
     if dtype in warning_dtypes:
         ctx = pytest.warns(UserWarning, match=r"fp8e4b15 is deprecated in this architecture")
@@ -370,11 +352,12 @@ def test_fp8_support(dtype):
 
     with ctx as e:
         triton.compile(
-            triton.compiler.ASTSource(fn=dtype_kernel, signature={"dtype": "constexpr"}, constexprs={"dtype": dtype}))
+            triton.compiler.ASTSource(fn=dtype_kernel, signature={"dtype": "constexpr"}, constexprs={"dtype": dtype})
+        )
 
     if dtype not in supported_dtypes:
         try:
-            assert ("not supported in this architecture" in str(e.value.__cause__))
+            assert "not supported in this architecture" in str(e.value.__cause__)
         except AssertionError as assertion_err:
             raise assertion_err from e.value
 
@@ -416,15 +399,15 @@ def test_min_dot_size(dtype):
 
     with pytest.raises(CompilationError) as e:
         triton.compile(
-            triton.compiler.ASTSource(fn=dot_kernel, signature={"dtype": "constexpr"}, constexprs={"dtype": dtype}))
+            triton.compiler.ASTSource(fn=dot_kernel, signature={"dtype": "constexpr"}, constexprs={"dtype": dtype})
+        )
     try:
-        assert (error_msg in str(e.value.__cause__))
+        assert error_msg in str(e.value.__cause__)
     except AssertionError as assertion_err:
         raise assertion_err from e.value
 
 
 def test_max_num_imprecise_acc_limit():
-
     @triton.jit
     def dot_kernel():
         SIZE: tl.constexpr = 64
@@ -435,6 +418,6 @@ def test_max_num_imprecise_acc_limit():
     with pytest.raises(CompilationError) as e:
         triton.compile(triton.compiler.ASTSource(fn=dot_kernel, signature={}, constexprs={}))
     try:
-        assert (str(e.value.__cause__) == "max_num_imprecise_acc (128) must be <= K (64)")
+        assert str(e.value.__cause__) == "max_num_imprecise_acc (128) must be <= K (64)"
     except AssertionError as assertion_err:
         raise assertion_err from e.value

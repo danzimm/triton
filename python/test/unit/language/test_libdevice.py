@@ -24,8 +24,8 @@ def test_bessel(dtype_str, libdevice_fn, torch_special_fn, device):
     SIZE = 128
     dtype = getattr(torch, dtype_str)
 
-    x = torch.randn((SIZE, ), dtype=dtype, device=device)
-    y_exp = torch.empty((SIZE, ), dtype=dtype, device=device)
+    x = torch.randn((SIZE,), dtype=dtype, device=device)
+    y_exp = torch.empty((SIZE,), dtype=dtype, device=device)
     y_ref = getattr(torch.special, torch_special_fn)(x)
 
     @triton.jit
@@ -35,7 +35,7 @@ def test_bessel(dtype_str, libdevice_fn, torch_special_fn, device):
         res = getattr(libdevice, fn)(x)
         tl.store(out_p + off, res)
 
-    kernel[(1, )](x, y_exp, fn=libdevice_fn, SIZE=SIZE, num_warps=4, num_ctas=1)
+    kernel[(1,)](x, y_exp, fn=libdevice_fn, SIZE=SIZE, num_warps=4, num_ctas=1)
 
     torch.testing.assert_close(y_ref, y_exp, equal_nan=True)
 
@@ -54,4 +54,4 @@ def test_libdevice_rename(device):
     inp = torch.randn(BLOCK_SIZE, device=device)
     out = torch.empty_like(inp)
 
-    triton_copy[(1, )](inp, out, BLOCK_SIZE)
+    triton_copy[(1,)](inp, out, BLOCK_SIZE)

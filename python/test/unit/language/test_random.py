@@ -12,7 +12,6 @@ import triton.language as tl
 
 
 class PhiloxConfig:
-
     def __init__(self, PHILOX_ROUND_A, PHILOX_ROUND_B, PHILOX_KEY_A, PHILOX_KEY_B, DTYPE):
         self.PHILOX_ROUND_A = np.array(PHILOX_ROUND_A, dtype=DTYPE)
         self.PHILOX_ROUND_B = np.array(PHILOX_ROUND_B, dtype=DTYPE)
@@ -41,7 +40,6 @@ PHILOX_64 = PhiloxConfig(
 
 
 class CustomPhilox4x:
-
     def __init__(self, seed, config):
         self._config = config
         seed = self._into_pieces(seed)
@@ -95,7 +93,6 @@ class CustomPhilox4x:
 
 
 class CustomPhilox(CustomPhilox4x):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.buffer = []
@@ -116,16 +113,21 @@ BLOCK: tl.constexpr = 1024
 
 
 @pytest.mark.interpreter
-@pytest.mark.parametrize('size, seed, dtype, const_seed', [(size, seed, dtype, const_seed)
-                                                           for size in ['10', '4,53', '400']
-                                                           for seed in [0, 42, 124, 54, 0xffffffff, 0x0000000fcafeb0ba]
-                                                           for dtype in ['int32', 'int64']
-                                                           for const_seed in [True, False]])
+@pytest.mark.parametrize(
+    "size, seed, dtype, const_seed",
+    [
+        (size, seed, dtype, const_seed)
+        for size in ["10", "4,53", "400"]
+        for seed in [0, 42, 124, 54, 0xFFFFFFFF, 0x0000000FCAFEB0BA]
+        for dtype in ["int32", "int64"]
+        for const_seed in [True, False]
+    ],
+)
 def test_randint(size, seed, device, dtype, const_seed):
-    size = list(map(int, size.split(',')))
+    size = list(map(int, size.split(",")))
     torch_dtype = getattr(torch, dtype)
     numpy_dtype = getattr(np, f"u{dtype}")
-    config = {'int32': PHILOX_32, 'int64': PHILOX_64}[dtype]
+    config = {"int32": PHILOX_32, "int64": PHILOX_64}[dtype]
 
     @triton.jit
     def kernel(X, N, seed):
@@ -144,7 +146,7 @@ def test_randint(size, seed, device, dtype, const_seed):
     # triton result
     x = torch.empty(size, dtype=torch_dtype, device=device)
     N = x.numel()
-    grid = (triton.cdiv(N, BLOCK), )
+    grid = (triton.cdiv(N, BLOCK),)
     if const_seed:
         const_kernel[grid](x, N, seed=seed)
     else:
@@ -160,13 +162,17 @@ def test_randint(size, seed, device, dtype, const_seed):
 
 
 @pytest.mark.interpreter
-@pytest.mark.parametrize('size, seed, dtype, const_seed', [(size, seed, dtype, const_seed)
-                                                           for size in [100000]
-                                                           for seed in [0, 42, 124, 54]
-                                                           for dtype in ['int32', 'int64']
-                                                           for const_seed in [True, False]])
+@pytest.mark.parametrize(
+    "size, seed, dtype, const_seed",
+    [
+        (size, seed, dtype, const_seed)
+        for size in [100000]
+        for seed in [0, 42, 124, 54]
+        for dtype in ["int32", "int64"]
+        for const_seed in [True, False]
+    ],
+)
 def test_rand(size, seed, dtype, device, const_seed):
-
     @triton.jit
     def kernel(X, N, seed, dtype: tl.constexpr):
         pid = tl.program_id(0).to(dtype)
@@ -184,26 +190,30 @@ def test_rand(size, seed, dtype, device, const_seed):
     # triton result
     x = torch.empty(size, dtype=torch.float32, device=device)
     N = x.numel()
-    grid = (triton.cdiv(N, BLOCK), )
+    grid = (triton.cdiv(N, BLOCK),)
     if const_seed:
         const_kernel[grid](x, N, seed=seed, dtype=getattr(tl, dtype))
     else:
         kernel[grid](x, N, seed, dtype=getattr(tl, dtype))
     assert all((x >= 0) & (x <= 1))
-    assert scipy.stats.kstest(x.tolist(), 'uniform', args=(0, 1)).statistic < 0.01
+    assert scipy.stats.kstest(x.tolist(), "uniform", args=(0, 1)).statistic < 0.01
 
 
 # test normal PRNG
 
 
 @pytest.mark.interpreter
-@pytest.mark.parametrize('size, seed, dtype, const_seed', [(size, seed, dtype, const_seed)
-                                                           for size in [100000]
-                                                           for seed in [0, 42, 124, 54]
-                                                           for dtype in ['int32', 'int64']
-                                                           for const_seed in [True, False]])
+@pytest.mark.parametrize(
+    "size, seed, dtype, const_seed",
+    [
+        (size, seed, dtype, const_seed)
+        for size in [100000]
+        for seed in [0, 42, 124, 54]
+        for dtype in ["int32", "int64"]
+        for const_seed in [True, False]
+    ],
+)
 def test_randn(size, seed, dtype, device, const_seed):
-
     @triton.jit
     def kernel(X, N, seed, dtype: tl.constexpr):
         pid = tl.program_id(0).to(dtype)
@@ -221,7 +231,7 @@ def test_randn(size, seed, dtype, device, const_seed):
     # triton result
     x = torch.empty(size, dtype=torch.float32, device=device)
     N = x.numel()
-    grid = (triton.cdiv(N, BLOCK), )
+    grid = (triton.cdiv(N, BLOCK),)
     if const_seed:
         const_kernel[grid](x, N, seed=seed, dtype=getattr(tl, dtype))
     else:
@@ -234,9 +244,8 @@ def test_randn(size, seed, dtype, device, const_seed):
 
 
 @pytest.mark.interpreter
-@pytest.mark.parametrize('dtype', ['int32', 'int64'])
+@pytest.mark.parametrize("dtype", ["int32", "int64"])
 def test_rand_limits(dtype, device):
-
     @triton.jit
     def kernel(input, output, n: tl.constexpr):
         idx = tl.arange(0, n)
@@ -245,12 +254,16 @@ def test_rand_limits(dtype, device):
         tl.store(output + idx, y)
 
     torch_dtype = getattr(torch, dtype)
-    min_max_int = torch.tensor([
-        torch.iinfo(torch_dtype).min,
-        torch.iinfo(torch_dtype).max,
-    ], dtype=torch_dtype, device=device)
+    min_max_int = torch.tensor(
+        [
+            torch.iinfo(torch_dtype).min,
+            torch.iinfo(torch_dtype).max,
+        ],
+        dtype=torch_dtype,
+        device=device,
+    )
     output = torch.empty(2, dtype=torch.float32, device=device)
-    kernel[(1, )](min_max_int, output, 2)
+    kernel[(1,)](min_max_int, output, 2)
 
     assert output[0] == output[1]
     assert 1.0 - torch.finfo(torch.float32).eps <= output[0].item() < 1.0

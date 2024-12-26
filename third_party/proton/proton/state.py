@@ -40,7 +40,6 @@ class state:
         libproton.exit_state()
 
     def __call__(self, func):
-
         @wraps(func)
         def wrapper(*args, **kwargs):
             if get_profiling_on():

@@ -3,7 +3,6 @@ from typing import Optional
 
 
 class InterpreterError(TritonError):
-
     def __init__(self, error_message: Optional[str] = None):
         self.error_message = error_message
 
@@ -12,7 +11,6 @@ class InterpreterError(TritonError):
 
 
 class OutOfResources(TritonError):
-
     def __init__(self, required, limit, name):
         self.required = required
         self.limit = limit
@@ -27,7 +25,6 @@ class OutOfResources(TritonError):
 
 
 class PTXASError(TritonError):
-
     def __init__(self, error_message: Optional[str] = None):
         self.error_message = error_message
 

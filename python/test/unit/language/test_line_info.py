@@ -9,9 +9,7 @@ import triton.language as tl
 
 
 @triton.jit
-def kernel_single(X,
-                  Y,
-                  BLOCK: tl.constexpr):
+def kernel_single(X, Y, BLOCK: tl.constexpr):
     x = tl.load(X + tl.arange(0, BLOCK))
     tl.store(Y + tl.arange(0, BLOCK), x)
 
@@ -22,9 +20,7 @@ def device_inline(x):
 
 
 @triton.jit
-def kernel_call(X,
-                Y,
-                BLOCK: tl.constexpr):
+def kernel_call(X, Y, BLOCK: tl.constexpr):
     x = tl.load(X + tl.arange(0, BLOCK))
     y = device_inline(x)
     tl.store(Y + tl.arange(0, BLOCK), y)
@@ -85,11 +81,13 @@ def get_disassembler_command_and_debug_line_format():
 
     if backend == "cuda":
         from triton.backends.nvidia.compiler import _path_to_binary
+
         nvdisasm, _ = _path_to_binary("nvdisasm")
         return ("cubin", [nvdisasm, "-g"], "## File", ",")
 
     if backend == "hip":
         import shutil
+
         # Try to find llvm-objdump from the current PATH to disassmble hsaco.
         tool = shutil.which("llvm-objdump")
         if tool is not None:
@@ -101,7 +99,7 @@ def get_disassembler_command_and_debug_line_format():
 
 def extract_file_lines(command, anchor, separator, asm):
     fd, path = tempfile.mkstemp()
-    with open(fd, 'wb') as cubin:
+    with open(fd, "wb") as cubin:
         cubin.write(asm)
     asm = subprocess.check_output(command + [path]).decode("utf-8")
     file_lines = []
@@ -109,7 +107,7 @@ def extract_file_lines(command, anchor, separator, asm):
     for line in lines:
         # We are looking for an anchor string and a separator between the file name and line number.
         if anchor in line and separator in line:
-            entries = line[line.index(anchor):].split(separator)
+            entries = line[line.index(anchor) :].split(separator)
             if len(entries) == 2 and all(len(e) != 0 for e in entries):
                 file_lines.append((entries[0].strip(), entries[1].strip()))
     return file_lines
@@ -138,7 +136,8 @@ func_types = ["single", "call", "call_noinline", "autotune", "dot_combine", "cdi
 
 def is_interpreter():
     import os
-    return os.environ.get('TRITON_INTERPRET', '0') == '1'
+
+    return os.environ.get("TRITON_INTERPRET", "0") == "1"
 
 
 @pytest.mark.parametrize("func", func_types)
@@ -151,7 +150,7 @@ def test_line_info(func: str):
     except BaseException:
         pytest.skip("disassembler is not available")
 
-    shape = (128, )
+    shape = (128,)
     kernel_info = {}
     if func == "single":
         kernel_info = kernel_single.warmup(torch.float32, torch.float32, BLOCK=shape[0], grid=(1,))
@@ -168,24 +167,24 @@ def test_line_info(func: str):
 
     file_lines = extract_file_lines(command, anchor, separator, kernel_info.asm[obj_kind])
     if func == "single":
-        assert (check_file_lines(file_lines, "test_line_info.py", 15))
-        assert (check_file_lines(file_lines, "test_line_info.py", 16))
+        assert check_file_lines(file_lines, "test_line_info.py", 15)
+        assert check_file_lines(file_lines, "test_line_info.py", 16)
     elif func == "call":
-        assert (check_file_lines(file_lines, "test_line_info.py", 28))
-        assert (check_file_lines(file_lines, "test_line_info.py", 30))
+        assert check_file_lines(file_lines, "test_line_info.py", 28)
+        assert check_file_lines(file_lines, "test_line_info.py", 30)
     elif func == "call_noinline":
-        assert (check_file_lines(file_lines, "test_line_info.py", 42))
-        assert (check_file_lines(file_lines, "test_line_info.py", 35))
-        assert (check_file_lines(file_lines, "test_line_info.py", 37))
+        assert check_file_lines(file_lines, "test_line_info.py", 42)
+        assert check_file_lines(file_lines, "test_line_info.py", 35)
+        assert check_file_lines(file_lines, "test_line_info.py", 37)
     elif func == "autotune":
-        assert (check_file_lines(file_lines, "test_line_info.py", 53))
-        assert (check_file_lines(file_lines, "test_line_info.py", 54))
-        assert (check_file_lines(file_lines, "test_line_info.py", 55))
+        assert check_file_lines(file_lines, "test_line_info.py", 53)
+        assert check_file_lines(file_lines, "test_line_info.py", 54)
+        assert check_file_lines(file_lines, "test_line_info.py", 55)
     elif func == "dot_combine":
-        assert (check_file_lines(file_lines, "test_line_info.py", 65))
-        assert (check_file_lines(file_lines, "test_line_info.py", 66, should_contain=False))
+        assert check_file_lines(file_lines, "test_line_info.py", 65)
+        assert check_file_lines(file_lines, "test_line_info.py", 66, should_contain=False)
     elif func == "cdiv":
-        assert (check_file_lines(file_lines, "test_line_info.py", 75))
+        assert check_file_lines(file_lines, "test_line_info.py", 75)
 
 
 @pytest.mark.interpreter

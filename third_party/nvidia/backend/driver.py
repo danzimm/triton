@@ -15,7 +15,7 @@ from triton._utils import parse_list_string
 dirname = os.path.dirname(os.path.realpath(__file__))
 include_dir = [os.path.join(dirname, "include")]
 libdevice_dir = os.path.join(dirname, "lib")
-libraries = ['cuda']
+libraries = ["cuda"]
 
 
 @functools.lru_cache()
@@ -32,14 +32,14 @@ def libcuda_dirs():
     env_ld_library_path = os.getenv("LD_LIBRARY_PATH")
     if env_ld_library_path and not dirs:
         dirs = [dir for dir in env_ld_library_path.split(":") if os.path.exists(os.path.join(dir, "libcuda.so.1"))]
-    msg = 'libcuda.so cannot found!\n'
+    msg = "libcuda.so cannot found!\n"
     if locs:
-        msg += 'Possible files are located at %s.' % str(locs)
-        msg += 'Please create a symlink of libcuda.so to any of the files.'
+        msg += "Possible files are located at %s." % str(locs)
+        msg += "Please create a symlink of libcuda.so to any of the files."
     else:
         msg += 'Please make sure GPU is set up and then run "/sbin/ldconfig"'
-        msg += ' (requires sudo) to refresh the linker cache.'
-    assert any(os.path.exists(os.path.join(path, 'libcuda.so.1')) for path in dirs), msg
+        msg += " (requires sudo) to refresh the linker cache."
+    assert any(os.path.exists(os.path.join(path, "libcuda.so.1")) for path in dirs), msg
     return dirs
 
 
@@ -62,6 +62,7 @@ def compile_module_from_src(src, name):
             with open(so, "rb") as f:
                 cache_path = cache.put(f.read(), f"{name}.{ext}", binary=True)
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(name, cache_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -74,7 +75,6 @@ def compile_module_from_src(src, name):
 
 
 class CudaUtils(object):
-
     def __new__(cls):
         if not hasattr(cls, "instance"):
             cls.instance = super(CudaUtils, cls).__new__(cls)
@@ -96,7 +96,7 @@ class CudaUtils(object):
 
 
 def ty_to_cpp(ty):
-    if ty[0] == '*' or ty == "none":
+    if ty[0] == "*" or ty == "none":
         return "CUdeviceptr"
     return {
         "i1": "int32_t",
@@ -119,17 +119,16 @@ def ty_to_cpp(ty):
 
 
 def make_launcher(constants, signature, ids):
-
     def _extracted_type(ty):
-        if ty[0] == '*' or ty == "none":
+        if ty[0] == "*" or ty == "none":
             return "PyObject*"
         if ty == "nvTmaDesc":
             return "PyObject*"
-        if ty[0] == '[':
+        if ty[0] == "[":
             if ty == "[]":
                 return "[]"
             tys = parse_list_string(ty)
-            val = ','.join(map(_extracted_type, tys))
+            val = ",".join(map(_extracted_type, tys))
             return f"[{val}]"
         return ty_to_cpp(ty)
 
@@ -140,7 +139,7 @@ def make_launcher(constants, signature, ids):
             if ty == "[]":
                 return "()"
             tys = parse_list_string(ty)
-            val = ''.join(map(format_of, tys))
+            val = "".join(map(format_of, tys))
             return f"({val})"
         return {
             "PyObject*": "O",
@@ -157,16 +156,16 @@ def make_launcher(constants, signature, ids):
             "uint64_t": "K",
         }[ty]
 
-    signature = {k: v for k, v in signature.items() if v != 'constexpr'}
-    args_format = ''.join([format_of(_extracted_type(ty)) for ty in signature.values()])
+    signature = {k: v for k, v in signature.items() if v != "constexpr"}
+    args_format = "".join([format_of(_extracted_type(ty)) for ty in signature.values()])
     format = "iiiKKpOOOOO" + args_format
-    signature = ','.join(signature.values()).replace('[', '').replace(']', '')
-    signature = list(filter(bool, signature.split(',')))
+    signature = ",".join(signature.values()).replace("[", "").replace("]", "")
+    signature = list(filter(bool, signature.split(",")))
     signature = {i: s for i, s in enumerate(signature)}
-    args_list = ', ' + ', '.join(f"&_arg{i}" for i, ty in signature.items()) if len(signature) > 0 else ''
+    args_list = ", " + ", ".join(f"&_arg{i}" for i, ty in signature.items()) if len(signature) > 0 else ""
     # Record the end of regular arguments;
     # subsequent arguments are architecture-specific descriptors, such as tensor descriptors for CUDA.
-    arg_decls = ', '.join(f"{ty_to_cpp(ty)} arg{i}" for i, ty in signature.items())
+    arg_decls = ", ".join(f"{ty_to_cpp(ty)} arg{i}" for i, ty in signature.items())
     internal_args_list = []
     for i, ty in signature.items():
         if ty[0] == "*" or ty == "none":
@@ -492,7 +491,6 @@ PyMODINIT_FUNC PyInit___triton_launcher(void) {{
 
 
 class CudaLauncher(object):
-
     def __init__(self, src, metadata):
         ids = {"ids_of_const_exprs": src.fn.constexprs if hasattr(src, "fn") else tuple()}
         constants = src.constants if hasattr(src, "constants") else dict()
@@ -516,7 +514,6 @@ class CudaLauncher(object):
 
 
 class CudaDriver(GPUDriver):
-
     def __init__(self):
         self.utils = CudaUtils()  # TODO: make static
         self.launcher_cls = CudaLauncher
@@ -531,19 +528,23 @@ class CudaDriver(GPUDriver):
 
     def get_active_torch_device(self):
         import torch
+
         return torch.device("cuda", self.get_current_device())
 
     def get_device_interface(self):
         import torch
+
         return torch.cuda
 
     @staticmethod
     def is_active():
         import torch
+
         return torch.cuda.is_available() and (torch.version.hip is None)
 
     def get_benchmarker(self):
         from triton.testing import do_bench
+
         return do_bench
 
     def get_empty_cache_for_benchmark(self):
@@ -553,4 +554,4 @@ class CudaDriver(GPUDriver):
         # before each kernel call to make sure that the L2 cache
         # doesn't contain any input data before the run
         cache_size = 256 * 1024 * 1024
-        return torch.empty(int(cache_size // 4), dtype=torch.int, device='cuda')
+        return torch.empty(int(cache_size // 4), dtype=torch.int, device="cuda")

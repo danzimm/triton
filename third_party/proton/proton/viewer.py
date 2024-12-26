@@ -2,6 +2,7 @@ import argparse
 from collections import namedtuple
 import json
 import pandas as pd
+
 try:
     import hatchet as ht
     from hatchet.query import NegationQuery
@@ -116,15 +117,14 @@ avg_time_factor_dict = FactorDict("avg_time", {f"avg_{key}": value for key, valu
 bytes_factor_dict = FactorDict("bytes", {"byte/s": 1, "gbyte/s": 1e9, "tbyte/s": 1e12})
 
 derivable_metrics = {
-    **{key: bytes_factor_dict
-       for key in bytes_factor_dict.factor.keys()},
+    **{key: bytes_factor_dict for key in bytes_factor_dict.factor.keys()},
 }
 
 # FLOPS have a specific width to their metric
 default_flop_factor_dict = {"flop/s": 1, "gflop/s": 1e9, "tflop/s": 1e12}
 derivable_metrics.update(
-    {key: FactorDict("flops", default_flop_factor_dict)
-     for key in default_flop_factor_dict.keys()})
+    {key: FactorDict("flops", default_flop_factor_dict) for key in default_flop_factor_dict.keys()}
+)
 for width in TritonHook.flops_width:
     factor_name = f"flops{width}"
     factor_dict = {f"flop{width}/s": 1, f"gflop{width}/s": 1e9, f"tflop{width}/s": 1e12}
@@ -137,7 +137,7 @@ def derive_metrics(gf, metrics, raw_metrics, device_info):
 
     def get_time_seconds(df):
         time_metric_name = match_available_metrics([time_factor_dict.name], raw_metrics)[0]
-        time_unit = (time_factor_dict.name + "/" + time_metric_name.split("(")[1].split(")")[0])
+        time_unit = time_factor_dict.name + "/" + time_metric_name.split("(")[1].split(")")[0]
         return df[time_metric_name] * time_factor_dict.factor[time_unit]
 
     for metric in metrics:
@@ -153,18 +153,19 @@ def derive_metrics(gf, metrics, raw_metrics, device_info):
             metric_name = derivable_metric.name
             metric_factor_dict = derivable_metric.factor
             matched_metric_name = match_available_metrics([metric_name], raw_metrics)[0]
-            gf.dataframe[f"{metric} (inc)"] = (gf.dataframe[matched_metric_name] / (get_time_seconds(gf.dataframe)) /
-                                               metric_factor_dict[metric])
+            gf.dataframe[f"{metric} (inc)"] = (
+                gf.dataframe[matched_metric_name] / (get_time_seconds(gf.dataframe)) / metric_factor_dict[metric]
+            )
             derived_metrics.append(f"{metric} (inc)")
         elif metric in time_factor_dict.factor:
             metric_time_unit = time_factor_dict.name + "/" + metric.split("/")[1]
-            gf.dataframe[f"{metric} (inc)"] = (get_time_seconds(gf.dataframe) /
-                                               time_factor_dict.factor[metric_time_unit])
+            gf.dataframe[f"{metric} (inc)"] = get_time_seconds(gf.dataframe) / time_factor_dict.factor[metric_time_unit]
             derived_metrics.append(f"{metric} (inc)")
         elif metric in avg_time_factor_dict.factor:
             metric_time_unit = avg_time_factor_dict.name + "/" + metric.split("/")[1]
-            gf.dataframe[f"{metric} (inc)"] = (get_time_seconds(gf.dataframe) / gf.dataframe['count'] /
-                                               avg_time_factor_dict.factor[metric_time_unit])
+            gf.dataframe[f"{metric} (inc)"] = (
+                get_time_seconds(gf.dataframe) / gf.dataframe["count"] / avg_time_factor_dict.factor[metric_time_unit]
+            )
             gf.dataframe.loc[internal_frame_indices, f"{metric} (inc)"] = np.nan
             derived_metrics.append(f"{metric} (inc)")
         else:
@@ -229,10 +230,10 @@ def parse(metrics, filename, include=None, exclude=None, threshold=None, depth=1
             print("Sorted kernels by metric " + metrics[0].strip("(inc)"))
             sorted_df = gf.dataframe.sort_values(by=[metrics[0]], ascending=False)
             for row in range(1, len(sorted_df)):
-                if len(sorted_df.iloc[row]['name']) > 100:
-                    kernel_name = sorted_df.iloc[row]['name'][:100] + "..."
+                if len(sorted_df.iloc[row]["name"]) > 100:
+                    kernel_name = sorted_df.iloc[row]["name"][:100] + "..."
                 else:
-                    kernel_name = sorted_df.iloc[row]['name']
+                    kernel_name = sorted_df.iloc[row]["name"]
                 print("{:105} {:.4}".format(kernel_name, sorted_df.iloc[row][metrics[0]]))
         emit_warnings(gf, metrics)
 
@@ -290,8 +291,7 @@ There are two modes:
         "--include",
         type=str,
         default=None,
-        help=
-        """Find frames that match the given regular expression and return all nodes in the paths that pass through the matching frames.
+        help="""Find frames that match the given regular expression and return all nodes in the paths that pass through the matching frames.
 For example, the following command will display all paths that contain frames that contains "test":
 ```
 proton-viewer -i ".*test.*" path/to/file.json
@@ -315,8 +315,7 @@ proton-viewer -e ".*test.*" path/to/file.json
         "--threshold",
         type=float,
         default=None,
-        help=
-        "Exclude frames(kernels) whose metrics are below the given threshold. This filter only applies on the first metric.",
+        help="Exclude frames(kernels) whose metrics are below the given threshold. This filter only applies on the first metric.",
     )
     argparser.add_argument(
         "-d",
@@ -326,16 +325,21 @@ proton-viewer -e ".*test.*" path/to/file.json
         help="The depth of the tree to display",
     )
     argparser.add_argument(
-        "-f", "--format", type=str, choices=["full", "file_function_line", "function_line", "file_function"],
-        default="full", help="""Formatting the frame name.
+        "-f",
+        "--format",
+        type=str,
+        choices=["full", "file_function_line", "function_line", "file_function"],
+        default="full",
+        help="""Formatting the frame name.
 - full: include the path, file name, function name and line number.
 - file_function_line: include the file name, function name and line number.
 - function_line: include the function name and line number.
 - file_function: include the file name and function name.
-""")
+""",
+    )
     argparser.add_argument(
         "--print-sorted",
-        action='store_true',
+        action="store_true",
         default=False,
         help="Sort output by metric value instead of chronologically",
     )

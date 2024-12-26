@@ -26,8 +26,8 @@ def _tuple_index(_0, Ptrs, _1: tl.constexpr, values, _2, _3: tl.constexpr, _4):
 @pytest.mark.parametrize("size", [0, 1, 2, 3, 4])
 def test_index(size, device="cuda"):
     vals = tuple([i + 1 for i in range(size)])
-    rets = tuple([torch.zeros((1, ), dtype=torch.float32, device=device) for _ in vals])
-    _tuple_index[(1, )](0, rets, 0, vals, 0, 0, 0)
+    rets = tuple([torch.zeros((1,), dtype=torch.float32, device=device) for _ in vals])
+    _tuple_index[(1,)](0, rets, 0, vals, 0, 0, 0)
     assert vals == tuple([x.item() - 1 for x in rets])
 
 
@@ -51,10 +51,10 @@ def _tuple_assign(XPtrs, YPtrs, values):
 
 
 def test_assign(device="cuda"):
-    vals = (2., 3.)
-    x = tuple([torch.zeros((1, ), dtype=torch.float32, device=device) for _ in range(2)])
-    y = tuple([torch.zeros((1, ), dtype=torch.float32, device=device) for _ in range(3)])
-    _tuple_assign[(1, )](x, y, vals)
+    vals = (2.0, 3.0)
+    x = tuple([torch.zeros((1,), dtype=torch.float32, device=device) for _ in range(2)])
+    y = tuple([torch.zeros((1,), dtype=torch.float32, device=device) for _ in range(3)])
+    _tuple_assign[(1,)](x, y, vals)
     assert x[0] == vals[0]
     assert x[1] == vals[1]
     assert y[0] == vals[0]
@@ -93,8 +93,8 @@ def test_serialize(device="cuda"):
     x0 = torch.tensor([8], dtype=torch.int32, device=device)
     x1 = torch.tensor([12], dtype=torch.int32, device=device)
     y0 = torch.tensor([10], dtype=torch.int32, device=device)
-    z = torch.empty((10, ), dtype=torch.int32, device=device)
+    z = torch.empty((10,), dtype=torch.int32, device=device)
     # we want to check that JIT specialization propagates to tuples:
-    _tuple_serialize[(1, )](z, None, (x0, (1, None, x1)), 20, 1, (y0, ))
+    _tuple_serialize[(1,)](z, None, (x0, (1, None, x1)), 20, 1, (y0,))
     ref = torch.tensor([8, 1, 12, 21, 10, 15, -1, 8, 1, 12], device=device)
     assert torch.equal(z, ref)

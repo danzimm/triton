@@ -35,8 +35,13 @@ def is_hip():
 
 
 def is_cdna():
-    return is_hip() and triton.runtime.driver.active.get_current_target().arch in ('gfx940', 'gfx941', 'gfx942',
-                                                                                   'gfx90a', 'gfx908')
+    return is_hip() and triton.runtime.driver.active.get_current_target().arch in (
+        "gfx940",
+        "gfx941",
+        "gfx942",
+        "gfx90a",
+        "gfx908",
+    )
 
 
 def naive_softmax(x):
@@ -82,8 +87,16 @@ def naive_softmax(x):
 
 
 @triton.jit
-def softmax_kernel(output_ptr, input_ptr, input_row_stride, output_row_stride, n_rows, n_cols, BLOCK_SIZE: tl.constexpr,
-                   num_stages: tl.constexpr):
+def softmax_kernel(
+    output_ptr,
+    input_ptr,
+    input_row_stride,
+    output_row_stride,
+    n_rows,
+    n_cols,
+    BLOCK_SIZE: tl.constexpr,
+    num_stages: tl.constexpr,
+):
     # starting row of the program
     row_start = tl.program_id(0)
     row_step = tl.num_programs(0)
@@ -96,7 +109,7 @@ def softmax_kernel(output_ptr, input_ptr, input_row_stride, output_row_stride, n
         input_ptrs = row_start_ptr + col_offsets
         # Load the row into SRAM, using a mask since BLOCK_SIZE may be > than n_cols
         mask = col_offsets < n_cols
-        row = tl.load(input_ptrs, mask=mask, other=-float('inf'))
+        row = tl.load(input_ptrs, mask=mask, other=-float("inf"))
         # Subtract maximum for numerical stability
         row_minus_max = row - tl.max(row, axis=0)
         # Note that exponentiation in Triton is fast but approximate (i.e., think __expf in CUDA)
@@ -140,8 +153,18 @@ def softmax(x):
     y = torch.empty_like(x)
 
     # pre-compile kernel to get register usage and compute thread occupancy.
-    kernel = softmax_kernel.warmup(y, x, x.stride(0), y.stride(0), n_rows, n_cols, BLOCK_SIZE=BLOCK_SIZE,
-                                   num_stages=num_stages, num_warps=num_warps, grid=(1, ))
+    kernel = softmax_kernel.warmup(
+        y,
+        x,
+        x.stride(0),
+        y.stride(0),
+        n_rows,
+        n_cols,
+        BLOCK_SIZE=BLOCK_SIZE,
+        num_stages=num_stages,
+        num_warps=num_warps,
+        grid=(1,),
+    )
     kernel._init_handles()
     n_regs = kernel.n_regs
     size_smem = kernel.metadata.shared
@@ -208,26 +231,27 @@ assert torch.allclose(y_triton, y_torch), (y_triton, y_torch)
 
 @triton.testing.perf_report(
     triton.testing.Benchmark(
-        x_names=['N'],  # argument names to use as an x-axis for the plot
+        x_names=["N"],  # argument names to use as an x-axis for the plot
         x_vals=[128 * i for i in range(2, 100)],  # different possible values for `x_name`
-        line_arg='provider',  # argument name whose value corresponds to a different line in the plot
-        line_vals=['triton', 'torch'],  # possible values for `line_arg``
+        line_arg="provider",  # argument name whose value corresponds to a different line in the plot
+        line_vals=["triton", "torch"],  # possible values for `line_arg``
         line_names=[
             "Triton",
             "Torch",
         ],  # label name for the lines
-        styles=[('blue', '-'), ('green', '-')],  # line styles
+        styles=[("blue", "-"), ("green", "-")],  # line styles
         ylabel="GB/s",  # label name for the y-axis
         plot_name="softmax-performance",  # name for the plot. Used also as a file name for saving the plot.
-        args={'M': 4096},  # values for function arguments not in `x_names` and `y_name`
-    ))
+        args={"M": 4096},  # values for function arguments not in `x_names` and `y_name`
+    )
+)
 def benchmark(M, N, provider):
     x = torch.randn(M, N, device=DEVICE, dtype=torch.float32)
     stream = getattr(torch, DEVICE.type).Stream()
     getattr(torch, DEVICE.type).set_stream(stream)
-    if provider == 'torch':
+    if provider == "torch":
         ms = triton.testing.do_bench(lambda: torch.softmax(x, axis=-1))
-    if provider == 'triton':
+    if provider == "triton":
         ms = triton.testing.do_bench(lambda: softmax(x))
     gbps = lambda ms: 2 * x.numel() * x.element_size() * 1e-9 / (ms * 1e-3)
     return gbps(ms)

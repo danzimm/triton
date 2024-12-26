@@ -9,16 +9,17 @@ from . import runtime
 
 
 def nvsmi(attrs):
-    attrs = ','.join(attrs)
-    cmd = ['nvidia-smi', '-i', '0', '--query-gpu=' + attrs, '--format=csv,noheader,nounits']
+    attrs = ",".join(attrs)
+    cmd = ["nvidia-smi", "-i", "0", "--query-gpu=" + attrs, "--format=csv,noheader,nounits"]
     out = subprocess.check_output(cmd)
-    ret = out.decode(sys.stdout.encoding).split(',')
+    ret = out.decode(sys.stdout.encoding).split(",")
     ret = [int(x) for x in ret]
     return ret
 
 
 def _summarize_statistics(times, quantiles, return_mode):
     import torch
+
     if quantiles is not None:
         ret = torch.quantile(times, torch.tensor(quantiles, dtype=torch.float)).tolist()
         if len(ret) == 1:
@@ -43,6 +44,7 @@ def do_bench_cudagraph(fn, rep=20, grad_to_none=None, quantiles=None, return_mod
     :type return_mode: str
     """
     import torch
+
     assert return_mode in ["min", "max", "mean", "median", "all"]
 
     with torch.cuda.stream(torch.cuda.Stream()):
@@ -158,7 +160,7 @@ def do_bench(fn, warmup=25, rep=100, grad_to_none=None, quantiles=None, return_m
     return _summarize_statistics(times, quantiles, return_mode)
 
 
-def assert_close(x, y, atol=None, rtol=None, err_msg=''):
+def assert_close(x, y, atol=None, rtol=None, err_msg=""):
     """
     Asserts that two inputs are close within a certain tolerance.
 
@@ -187,7 +189,7 @@ def assert_close(x, y, atol=None, rtol=None, err_msg=''):
     atol = atol(x.dtype) if callable(atol) else atol
     # relative tolerance hook
     if rtol is None:
-        rtol = 0.
+        rtol = 0.0
     rtol = rtol(x.dtype) if callable(rtol) else rtol
     # we use numpy instead of pytorch
     # as it seems more memory efficient
@@ -206,7 +208,7 @@ def assert_close(x, y, atol=None, rtol=None, err_msg=''):
         np.testing.assert_allclose(x, y, atol=atol, rtol=rtol, equal_nan=True)
         return
     if not np.allclose(x, y, atol=atol, rtol=rtol):
-        raise AssertionError(f'{err_msg} {x} is not close to {y} (atol={atol}, rtol={rtol})')
+        raise AssertionError(f"{err_msg} {x} is not close to {y} (atol={atol}, rtol={rtol})")
 
 
 class Benchmark:
@@ -223,8 +225,8 @@ class Benchmark:
         line_names: List[str],
         plot_name: str,
         args: Dict[str, Any],
-        xlabel: str = '',
-        ylabel: str = '',
+        xlabel: str = "",
+        ylabel: str = "",
         x_log: bool = False,
         y_log: bool = False,
         styles=None,
@@ -277,20 +279,28 @@ class Benchmark:
 
 
 class Mark:
-
     def __init__(self, fn, benchmarks):
         self.fn = fn
         self.benchmarks = benchmarks
 
-    def _run(self, bench: Benchmark, save_path: str, show_plots: bool, print_data: bool, diff_col=False,
-             save_precision=6, **kwrags):
+    def _run(
+        self,
+        bench: Benchmark,
+        save_path: str,
+        show_plots: bool,
+        print_data: bool,
+        diff_col=False,
+        save_precision=6,
+        **kwrags,
+    ):
         import os
 
         import matplotlib.pyplot as plt
         import pandas as pd
+
         y_mean = bench.line_names
-        y_min = [f'{x}-min' for x in bench.line_names]
-        y_max = [f'{x}-max' for x in bench.line_names]
+        y_min = [f"{x}-min" for x in bench.line_names]
+        y_max = [f"{x}-max" for x in bench.line_names]
         x_names = list(bench.x_names)
         df = pd.DataFrame(columns=x_names + y_mean + y_min + y_max)
         for x in bench.x_vals:
@@ -320,7 +330,7 @@ class Mark:
             # Plot first x value on x axis if there are multiple.
             first_x = x_names[0]
             for i, y in enumerate(bench.line_names):
-                y_min, y_max = df[y + '-min'], df[y + '-max']
+                y_min, y_max = df[y + "-min"], df[y + "-max"]
                 col = bench.styles[i][0] if bench.styles else None
                 sty = bench.styles[i][1] if bench.styles else None
                 ax.plot(df[first_x], df[y], label=y, color=col, ls=sty)
@@ -341,17 +351,18 @@ class Mark:
         df = df[x_names + bench.line_names]
         if diff_col and df.shape[1] == 2:
             col0, col1 = df.columns.tolist()
-            df['Diff'] = df[col1] - df[col0]
+            df["Diff"] = df[col1] - df[col0]
 
         if print_data:
-            print(bench.plot_name + ':')
+            print(bench.plot_name + ":")
             print(df.to_string())
         if save_path:
-            df.to_csv(os.path.join(save_path, f"{bench.plot_name}.csv"), float_format=f"%.{save_precision}f",
-                      index=False)
+            df.to_csv(
+                os.path.join(save_path, f"{bench.plot_name}.csv"), float_format=f"%.{save_precision}f", index=False
+            )
         return df
 
-    def run(self, show_plots=False, print_data=False, save_path='', return_df=False, **kwargs):
+    def run(self, show_plots=False, print_data=False, save_path="", return_df=False, **kwargs):
         has_single_bench = isinstance(self.benchmarks, Benchmark)
         benchmarks = [self.benchmarks] if has_single_bench else self.benchmarks
         result_dfs = []
@@ -363,7 +374,7 @@ class Mark:
         for bench in benchmarks:
             result_dfs.append(self._run(bench, save_path, show_plots, print_data, **kwargs))
             if save_path:
-                html.write(f"<image src=\"{bench.plot_name}.png\"/>\n")
+                html.write(f'<image src="{bench.plot_name}.png"/>\n')
         if save_path:
             html.write("</body></html>\n")
             html.close()
@@ -387,10 +398,11 @@ def perf_report(benchmarks):
 
 
 def get_dram_gbps(device=None):
-    ''' return DRAM bandwidth in GB/s '''
+    """return DRAM bandwidth in GB/s"""
     import torch
 
     from .runtime import driver
+
     if not device:
         device = torch.cuda.current_device()
     mem_clock_khz = driver.active.utils.get_device_properties(device)["mem_clock_rate"]  # in kHz
@@ -403,6 +415,7 @@ def get_max_tensorcore_tflops(dtype, clock_rate, device=None):
     import torch
 
     from .runtime import driver
+
     if not device:
         device = torch.cuda.current_device()
 
@@ -429,20 +442,19 @@ def get_max_tensorcore_tflops(dtype, clock_rate, device=None):
 
 
 def cuda_memcheck(**target_kwargs):
-
     def decorator(test_fn):
-
         @functools.wraps(test_fn)
         def wrapper(*args, **kwargs):
             import psutil
+
             ppid_name = psutil.Process(os.getppid()).name()
             run_cuda_memcheck = target_kwargs.items() <= kwargs.items()
             if run_cuda_memcheck and ppid_name != "cuda-memcheck":
                 path = os.path.realpath(test_fn.__globals__["__file__"])
                 # get path of current file
                 env = {"PATH": os.environ["PATH"], "PYTORCH_NO_CUDA_MEMORY_CACHING": "1"}
-                assert 'request' in kwargs, "memcheck'ed test must have a (possibly unused) `request` fixture"
-                test_id = kwargs['request'].node.callspec.id
+                assert "request" in kwargs, "memcheck'ed test must have a (possibly unused) `request` fixture"
+                test_id = kwargs["request"].node.callspec.id
                 cmd = f"{path}::{test_fn.__name__}[{test_id}]"
                 out = subprocess.run(["cuda-memcheck", "pytest", "-vs", cmd], capture_output=True, env=env)
                 assert out.returncode == 0, "cuda-memcheck returned an error: bounds checking failed"
@@ -459,18 +471,22 @@ def cuda_memcheck(**target_kwargs):
 def set_gpu_clock(ref_sm_clock=1350, ref_mem_clock=1215):
     try:
         subprocess.check_output(["nvidia-smi", "-i", "0", "-pm", "1"])
-        subprocess.check_output([
-            "nvidia-smi",
-            "-i",
-            "0",
-            f"--lock-gpu-clocks={ref_sm_clock},{ref_sm_clock}",
-        ])
-        subprocess.check_output([
-            "nvidia-smi",
-            "-i",
-            "0",
-            f"--lock-memory-clocks={ref_mem_clock},{ref_mem_clock}",
-        ])
+        subprocess.check_output(
+            [
+                "nvidia-smi",
+                "-i",
+                "0",
+                f"--lock-gpu-clocks={ref_sm_clock},{ref_sm_clock}",
+            ]
+        )
+        subprocess.check_output(
+            [
+                "nvidia-smi",
+                "-i",
+                "0",
+                f"--lock-memory-clocks={ref_mem_clock},{ref_mem_clock}",
+            ]
+        )
         cur_sm_clock = nvsmi(["clocks.current.sm"])[0]
         cur_mem_clock = nvsmi(["clocks.current.memory"])[0]
         assert abs(cur_sm_clock - ref_sm_clock) < 10, f"GPU SMs must run at {ref_sm_clock} MHz"
@@ -488,6 +504,7 @@ def get_max_simd_tflops(dtype, clock_rate, device=None):
     import torch
 
     from .runtime import driver
+
     if not device:
         device = torch.cuda.current_device()
 
