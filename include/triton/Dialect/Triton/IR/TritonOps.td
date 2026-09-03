@@ -1138,7 +1138,8 @@ def CallOp : TT_Op<"call", [CallOpInterface, /*MemRefsNormalizable, */DeclareOpI
 
 def FuncOp : TT_Op<"func", [
     AffineScope, AutomaticAllocationScope, CallableOpInterface,
-    FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface,
+    FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface, SymbolName,
+    SymbolVisibility,
     HasParent<"ModuleOp">
 ]> {
   let summary = "An operation with a name containing a single `SSACFG` region";
