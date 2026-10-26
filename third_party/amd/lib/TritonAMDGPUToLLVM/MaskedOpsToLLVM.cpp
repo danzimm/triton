@@ -105,6 +105,10 @@ public:
     //              | 0/1       | 1       | (cg) global load nt
     //              | 1         | 0       | (cv) flat load sc0 sc1
     auto loadResult = createLoadWithAttrs(loc);
+    auto addressSpace =
+        cast<LLVM::LLVMPointerType>(ptr.getType()).getAddressSpace();
+    if (targetInfo.useAsyncMarks() && (addressSpace == 0 || addressSpace == 1))
+      ROCDL::PadCounterOp::create(rewriter, loc, 0u, 1u);
     LLVM::BrOp::create(rewriter, loc, ValueRange{loadResult}, afterLoad);
 
     rewriter.replaceOp(loadOp, afterLoad->getArgument(0));

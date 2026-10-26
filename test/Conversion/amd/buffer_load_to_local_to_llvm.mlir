@@ -397,9 +397,32 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, "ttg.thr
     // COMMON: llvm.cond_br %{{.*}}, ^[[LOAD_BB:bb[0-9]+]], ^[[AFTER_BB:bb[0-9]+]]
     // COMMON-NEXT: ^[[LOAD_BB]]:
     // COMMON: rocdl.raw.ptr.buffer.load.async.lds
+    // COMMON-NOT: rocdl.pad.counter
     // COMMON-NEXT: llvm.br ^[[AFTER_BB]]
     // The `other` store must appear in the after-load block so it is reached
     // regardless of whether the load branch was taken (i.e., for masked-out lanes).
+    // COMMON-NEXT: ^[[AFTER_BB]]:
+    // COMMON: llvm.store
+    amdg.buffer_load_to_local %ptr[%off] mask=%mask other=%other into %lds : !tt.ptr<f32>[tensor<64xi32, #blocked>] tensor<64xf32, #blocked> -> <64xf32, #shared, #smem, mutable>
+    tt.return
+  }
+}
+
+// -----
+
+#blocked = #ttg.blocked<{sizePerThread = [1], threadsPerWarp = [64], warpsPerCTA = [4], order = [0]}>
+#shared = #ttg.swizzled_shared<{vec = 1, perPhase = 1, maxPhase = 1, order = [0]}>
+#smem = #ttg.shared_memory
+module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, "ttg.threads-per-warp" = 64 : i32} {
+  // COMMON-LABEL: @buffer_load_to_local_nonzero_other_counter_padding
+  tt.func @buffer_load_to_local_nonzero_other_counter_padding(%ptr: !tt.ptr<f32>, %lds: !ttg.memdesc<64xf32, #shared, #smem, mutable>, %mask: tensor<64xi1, #blocked>) {
+    %off = tt.make_range {end = 64 : i32, start = 0 : i32} : tensor<64xi32, #blocked>
+    %other = arith.constant dense<1.0> : tensor<64xf32, #blocked>
+    // COMMON: llvm.cond_br %{{.*}}, ^[[LOAD_BB:bb[0-9]+]], ^[[AFTER_BB:bb[0-9]+]]
+    // COMMON-NEXT: ^[[LOAD_BB]]:
+    // COMMON: rocdl.raw.ptr.buffer.load.async.lds
+    // COMMON-NEXT: rocdl.pad.counter 0, 1
+    // COMMON-NEXT: llvm.br ^[[AFTER_BB]]
     // COMMON-NEXT: ^[[AFTER_BB]]:
     // COMMON: llvm.store
     amdg.buffer_load_to_local %ptr[%off] mask=%mask other=%other into %lds : !tt.ptr<f32>[tensor<64xi32, #blocked>] tensor<64xf32, #blocked> -> <64xf32, #shared, #smem, mutable>

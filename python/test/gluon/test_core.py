@@ -2694,6 +2694,48 @@ def test_amd_direct_load_to_shared(use_buffer_load):
     assert 'vmcnt(0)' in pgm.asm['amdgcn']
 
 
+@pytest.mark.skipif(not is_hip_cdna4(), reason="Requires CDNA4")
+@pytest.mark.parametrize("use_buffer_load", [False, True])
+@pytest.mark.parametrize("other", [0.0, 1.0])
+def test_amd_counter_padding_masked_load(use_buffer_load, other):
+
+    @gluon.jit
+    def kernel(inp, out, live, USE_BUFFER: ttgl.constexpr, OTHER: ttgl.constexpr):
+        blocked: ttgl.constexpr = ttgl.BlockedLayout([1], [64], [4], [0])
+        shared: ttgl.constexpr = ttgl.SwizzledSharedLayout(1, 1, 1, order=[0])
+        offsets = ttgl.arange(0, 256, layout=blocked)
+        first = ttgl.allocate_shared_memory(ttgl.float32, [256], shared)
+        second = ttgl.allocate_shared_memory(ttgl.float32, [256], shared)
+        cdna4_async_copy.global_load_to_shared(first, inp + offsets)
+        cdna4_async_copy.commit_group()
+        if USE_BUFFER:
+            cdna4_async_copy.buffer_load_to_shared(second, inp, offsets, mask=offsets < live, other=OTHER)
+        else:
+            cdna4_async_copy.global_load_to_shared(second, inp + offsets, mask=offsets < live, other=OTHER)
+        cdna4_async_copy.commit_group()
+        cdna4_async_copy.wait_group(1)
+        x = cdna4_async_copy.load_shared_relaxed(first, blocked)
+        cdna4_async_copy.wait_group(0)
+        y = cdna4_async_copy.load_shared_relaxed(second, blocked)
+        ttgl.store(out + offsets, x + y)
+
+    inp = torch.arange(256, dtype=torch.float32, device="cuda")
+    out = torch.empty_like(inp)
+    for live in (0, 192, 256):
+        pgm = kernel[(1, )](inp, out, live, use_buffer_load, other)
+        expected = inp + torch.where(torch.arange(256, device="cuda") < live, inp, other)
+        torch.testing.assert_close(out, expected, rtol=0, atol=0)
+
+    has_hint = "llvm.amdgcn.pad.counter" in pgm.asm["llir"]
+    assert has_hint == (not use_buffer_load or other != 0)
+    assert "pad.counter" not in pgm.asm["amdgcn"]
+    if has_hint:
+        assert "buffer_inv" in pgm.asm["amdgcn"]
+        assert "vmcnt(1)" in pgm.asm["amdgcn"]
+    else:
+        assert "buffer_inv" not in pgm.asm["amdgcn"]
+
+
 @pytest.mark.skipif(not (is_hip_rdna3() or is_hip_rdna4()), reason="Requires RDNA3 or RDNA4")
 @pytest.mark.parametrize("M, N, K", [(64, 64, 64)])
 @pytest.mark.parametrize("in_dtype", ['float16', 'bfloat16'])

@@ -157,24 +157,28 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shar
 
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
 
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
 
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
 
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
@@ -221,6 +225,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shar
     // CHECK: rocdl.ballot
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
@@ -229,6 +234,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shar
     // CHECK: rocdl.ballot
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
@@ -237,6 +243,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shar
     // CHECK: rocdl.ballot
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
@@ -245,6 +252,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shar
     // CHECK: rocdl.ballot
     // CHECK: llvm.cond_br
     // CHECK: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
     // CHECK-NEXT: llvm.br
     // CHECK: llvm.cond_br
     // CHECK: llvm.store
@@ -368,6 +376,10 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, "ttg.thr
     // CHECK: llvm.cond_br %[[PRED]], ^[[LOAD_BLOCK:bb[0-9]+]]
     // CHECK-NEXT: ^[[LOAD_BLOCK]]:
     // CHECK-NEXT: rocdl.global.load.async.lds
+    // CHECK-NEXT: rocdl.pad.counter 0, 1
+    // GFX950-LABEL: @async_copy_warp_uniform_thread_pred_with_per_lane_mask
+    // GFX950: rocdl.global.load.async.lds
+    // GFX950-NEXT: rocdl.pad.counter 0, 1
     %0 = ttg.async_copy_global_to_local %src, %lds mask %mask other %other : tensor<64x!tt.ptr<f32>, #blocked> -> <64xf32, #shared, #smem, mutable>
     tt.return
   }
