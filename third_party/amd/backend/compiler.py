@@ -261,6 +261,13 @@ class HIPOptions:
     # WGP/CU execution mode for gfx11 and gfx120x; ignored on other targets.
     wgp_cu_mode: str = "wgp"
 
+    # Experimental: emit llvm.amdgcn.pad.waitcnt hints in branched masked-load arms on gfx942/gfx950
+    # so the backend pads the opposite arm with matching LOAD counter events, keeping later partial
+    # waits exact on both paths. Requires an LLVM toolchain that provides the intrinsic. Off by
+    # default; enable per kernel with `kernel[grid](..., counter_padding=True)` or process-wide with
+    # TRITON_HIP_COUNTER_PADDING=1.
+    counter_padding: bool = False
+
     # Experimental hint for how the AMD backend schedules a kernel's instructions. The only
     # recognized value is "mfma-schedule" (gfx942 and gfx950): run the MFMA scheduler on the optimized
     # LLVM IR. It interleaves the MFMAs of each hot loop with the memory operations that are
@@ -364,6 +371,8 @@ class HIPBackend(BaseBackend):
             deprecated_fp8_dot_operand_dtypes.update({"fp8e5b16", "fp8e4b8"})
             args["deprecated_fp8_dot_operand_dtypes"] = tuple(sorted(deprecated_fp8_dot_operand_dtypes))
 
+        if knobs.amd.counter_padding is not None:
+            args["counter_padding"] = knobs.amd.counter_padding
         args.update({k: opts[k] for k in HIPOptions.__dataclass_fields__.keys() if k in opts and opts[k] is not None})
         args["enable_fp_fusion"] = knobs.language.fp_fusion_enabled(args.get("enable_fp_fusion"))
         return HIPOptions(**args)
@@ -568,7 +577,8 @@ class HIPBackend(BaseBackend):
         ## 3. __HIP_FTZ is default to 1 and not exposed as a kernel argument.
         ##    For now it is used as a controller for developers only.
         __HIP_FTZ = True
-        amd.passes.ttgpuir.add_to_llvmir(pm, options.arch, __HIP_FTZ, options.wgp_cu_mode == "cu")
+        amd.passes.ttgpuir.add_to_llvmir(pm, options.arch, __HIP_FTZ, options.wgp_cu_mode == "cu",
+                                         options.counter_padding)
         # Lower Proton segment values before warp specialization captures partition operands.
         instrument(pm, point="llvmir-to-llvm", context=mod.context)
         amd.passes.ttgpuir.add_warp_specialize_to_llvm(pm, options.arch)

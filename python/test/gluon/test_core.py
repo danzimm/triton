@@ -2697,7 +2697,8 @@ def test_amd_direct_load_to_shared(use_buffer_load):
 @pytest.mark.skipif(not is_hip_cdna4(), reason="Requires CDNA4")
 @pytest.mark.parametrize("use_buffer_load", [False, True])
 @pytest.mark.parametrize("other", [0.0, 1.0])
-def test_amd_counter_padding_masked_load(use_buffer_load, other):
+@pytest.mark.parametrize("counter_padding", [False, True])
+def test_amd_counter_padding_masked_load(use_buffer_load, other, counter_padding):
 
     @gluon.jit
     def kernel(inp, out, live, USE_BUFFER: ttgl.constexpr, OTHER: ttgl.constexpr):
@@ -2722,12 +2723,12 @@ def test_amd_counter_padding_masked_load(use_buffer_load, other):
     inp = torch.arange(256, dtype=torch.float32, device="cuda")
     out = torch.empty_like(inp)
     for live in (0, 192, 256):
-        pgm = kernel[(1, )](inp, out, live, use_buffer_load, other)
+        pgm = kernel[(1, )](inp, out, live, use_buffer_load, other, counter_padding=counter_padding)
         expected = inp + torch.where(torch.arange(256, device="cuda") < live, inp, other)
         torch.testing.assert_close(out, expected, rtol=0, atol=0)
 
     has_hint = "llvm.amdgcn.pad.waitcnt" in pgm.asm["llir"]
-    assert has_hint == (not use_buffer_load or other != 0)
+    assert has_hint == (counter_padding and (not use_buffer_load or other != 0))
     assert "pad.waitcnt" not in pgm.asm["amdgcn"]
     if has_hint:
         assert "buffer_inv" in pgm.asm["amdgcn"]

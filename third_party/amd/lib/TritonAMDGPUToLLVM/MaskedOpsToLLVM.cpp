@@ -107,7 +107,8 @@ public:
     auto loadResult = createLoadWithAttrs(loc);
     auto addressSpace =
         cast<LLVM::LLVMPointerType>(ptr.getType()).getAddressSpace();
-    if (targetInfo.useAsyncMarks() && (addressSpace == 0 || addressSpace == 1))
+    if (targetInfo.emitCounterPadding() &&
+        (addressSpace == 0 || addressSpace == 1))
       ROCDL::PadWaitcntOp::create(rewriter, loc, ROCDL::WaitcntCounter::load,
                                   1u);
     LLVM::BrOp::create(rewriter, loc, ValueRange{loadResult}, afterLoad);
