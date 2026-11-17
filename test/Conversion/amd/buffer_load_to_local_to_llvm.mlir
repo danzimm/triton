@@ -397,7 +397,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, "ttg.thr
     // COMMON: llvm.cond_br %{{.*}}, ^[[LOAD_BB:bb[0-9]+]], ^[[AFTER_BB:bb[0-9]+]]
     // COMMON-NEXT: ^[[LOAD_BB]]:
     // COMMON: rocdl.raw.ptr.buffer.load.async.lds
-    // COMMON-NOT: rocdl.pad.counter
+    // COMMON-NOT: rocdl.pad.waitcnt
     // COMMON-NEXT: llvm.br ^[[AFTER_BB]]
     // The `other` store must appear in the after-load block so it is reached
     // regardless of whether the load branch was taken (i.e., for masked-out lanes).
@@ -421,7 +421,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, "ttg.thr
     // COMMON: llvm.cond_br %{{.*}}, ^[[LOAD_BB:bb[0-9]+]], ^[[AFTER_BB:bb[0-9]+]]
     // COMMON-NEXT: ^[[LOAD_BB]]:
     // COMMON: rocdl.raw.ptr.buffer.load.async.lds
-    // COMMON-NEXT: rocdl.pad.counter 0, 1
+    // COMMON-NEXT: rocdl.pad.waitcnt load, 1
     // COMMON-NEXT: llvm.br ^[[AFTER_BB]]
     // COMMON-NEXT: ^[[AFTER_BB]]:
     // COMMON: llvm.store

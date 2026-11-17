@@ -2726,9 +2726,9 @@ def test_amd_counter_padding_masked_load(use_buffer_load, other):
         expected = inp + torch.where(torch.arange(256, device="cuda") < live, inp, other)
         torch.testing.assert_close(out, expected, rtol=0, atol=0)
 
-    has_hint = "llvm.amdgcn.pad.counter" in pgm.asm["llir"]
+    has_hint = "llvm.amdgcn.pad.waitcnt" in pgm.asm["llir"]
     assert has_hint == (not use_buffer_load or other != 0)
-    assert "pad.counter" not in pgm.asm["amdgcn"]
+    assert "pad.waitcnt" not in pgm.asm["amdgcn"]
     if has_hint:
         assert "buffer_inv" in pgm.asm["amdgcn"]
         assert "vmcnt(1)" in pgm.asm["amdgcn"]

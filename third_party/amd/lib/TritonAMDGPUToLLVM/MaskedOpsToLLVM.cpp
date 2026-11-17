@@ -108,7 +108,8 @@ public:
     auto addressSpace =
         cast<LLVM::LLVMPointerType>(ptr.getType()).getAddressSpace();
     if (targetInfo.useAsyncMarks() && (addressSpace == 0 || addressSpace == 1))
-      ROCDL::PadCounterOp::create(rewriter, loc, 0u, 1u);
+      ROCDL::PadWaitcntOp::create(rewriter, loc, ROCDL::WaitcntCounter::load,
+                                  1u);
     LLVM::BrOp::create(rewriter, loc, ValueRange{loadResult}, afterLoad);
 
     rewriter.replaceOp(loadOp, afterLoad->getArgument(0));

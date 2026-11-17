@@ -40,7 +40,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, "ttg.thr
     // CHECK: llvm.cond_br {{.*}}, ^[[LOAD:bb[0-9]+]], ^[[JOIN:bb[0-9]+]]
     // CHECK: ^[[LOAD]]:
     // CHECK: llvm.load
-    // CHECK-NEXT: rocdl.pad.counter 0, 1
+    // CHECK-NEXT: rocdl.pad.waitcnt load, 1
     // CHECK-NEXT: llvm.br ^[[JOIN]]
     %value = tt.load %ptrs, %mask, %other : tensor<64x!tt.ptr<f32>, #blocked>
     tt.store %out, %value : tensor<64x!tt.ptr<f32>, #blocked>
@@ -55,7 +55,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, "ttg.thr
   // CHECK-LABEL: @unmasked_load_without_counter_padding
   tt.func @unmasked_load_without_counter_padding(%ptrs: tensor<64x!tt.ptr<f32>, #blocked>, %out: tensor<64x!tt.ptr<f32>, #blocked>) {
     // CHECK: llvm.load
-    // CHECK-NOT: rocdl.pad.counter
+    // CHECK-NOT: rocdl.pad.waitcnt
     // CHECK: llvm.return
     %value = tt.load %ptrs : tensor<64x!tt.ptr<f32>, #blocked>
     tt.store %out, %value : tensor<64x!tt.ptr<f32>, #blocked>
@@ -72,7 +72,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, "ttg.thr
     %other = arith.constant dense<0.0> : tensor<64xf32, #blocked>
     // Constant-address-space loads can use a different counter.
     // CHECK: llvm.load {{.*}} : !llvm.ptr<4>
-    // CHECK-NOT: rocdl.pad.counter
+    // CHECK-NOT: rocdl.pad.waitcnt
     // CHECK: llvm.return
     %value = tt.load %ptrs, %mask, %other : tensor<64x!tt.ptr<f32, "constant">, #blocked>
     tt.store %out, %value : tensor<64x!tt.ptr<f32>, #blocked>
