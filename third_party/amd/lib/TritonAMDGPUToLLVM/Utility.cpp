@@ -1318,4 +1318,10 @@ SmallVector<Value> upcast8xMxfp4_SW(RewriterBase &rewriter, Operation *op,
   return results;
 }
 
+void addBalanceWaitsAttr(Operation *memOp) {
+  MLIRContext *ctx = memOp->getContext();
+  ROCDL::ROCDLDialect::BalanceWaitsAttrHelper(ctx).setAttr(memOp,
+                                                           UnitAttr::get(ctx));
+}
+
 } // namespace mlir::LLVM::AMD

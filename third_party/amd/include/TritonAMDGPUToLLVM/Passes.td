@@ -34,7 +34,7 @@ def AllocateAMDGPUSharedMemory : Pass<"allocate-amdgpu-shared-memory", "mlir::Mo
 
 def ConvertTritonAMDGPUToLLVM : Pass<"convert-triton-amdgpu-to-llvm", "mlir::ModuleOp"> {
     let summary = "Convert TritonGPU to LLVM";
-    let constructor = "mlir::triton::createConvertTritonAMDGPUToLLVMPass(\"\", /*ftz=*/true, /*cuMode=*/false)";
+    let constructor = "mlir::triton::createConvertTritonAMDGPUToLLVMPass(\"\", /*ftz=*/true, /*cuMode=*/false, /*counterPadding=*/false)";
 
     let dependentDialects = ["mlir::arith::ArithDialect",
                              "mlir::math::MathDialect",
@@ -52,6 +52,8 @@ def ConvertTritonAMDGPUToLLVM : Pass<"convert-triton-amdgpu-to-llvm", "mlir::Mod
                "flush denorms for math functions">,
         Option<"cuMode", "cu-mode", "bool", /*default*/"false",
                "the kernel runs in CU rather than WGP execution mode">,
+        Option<"counterPadding", "counter-padding", "bool", /*default*/"false",
+               "annotate masked loads with rocdl.balance_waits (CDNA3/CDNA4)">,
     ];
 }
 

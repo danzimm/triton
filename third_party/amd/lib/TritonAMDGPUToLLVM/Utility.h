@@ -130,6 +130,11 @@ bool canLoadDirectToLDS(const triton::AMD::TargetInfo &targetInfo,
                         DirectToLdsVecInfo vecInfo = {},
                         std::string *failureReason = nullptr);
 
+// Annotate a conditionally executed memory op with rocdl.balance_waits so the
+// backend balances its wait counter events on the opposite edge of the branch
+// guarding it.
+void addBalanceWaitsAttr(Operation *memOp);
+
 // Check if the result of this tl.dot is used as opA or opB of another tl.dot.
 bool isChainDotHead(mlir::triton::DotOpInterface dotOp, unsigned opIdx = 0);
 

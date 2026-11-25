@@ -61,8 +61,9 @@ llvm::Triple getAMDTargetTriple(const std::string &arch) {
 void init_triton_amd_passes_ttgpuir(py::module_ &m) {
   using namespace mlir::triton;
   m.def("add_to_llvmir", [](mlir::PassManager &pm, const std::string &arch,
-                            bool ftz, bool cuMode) {
-    pm.addPass(createConvertTritonAMDGPUToLLVMPass(arch, ftz, cuMode));
+                            bool ftz, bool cuMode, bool counterPadding) {
+    pm.addPass(
+        createConvertTritonAMDGPUToLLVMPass(arch, ftz, cuMode, counterPadding));
   });
   ADD_PASS_OPTION_WRAPPER_1("add_membar", createTritonAMDGPUMembar,
                             const std::string &);

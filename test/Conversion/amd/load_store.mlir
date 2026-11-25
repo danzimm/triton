@@ -1,4 +1,8 @@
-// RUN: triton-opt %s -split-input-file --convert-scf-to-cf --convert-triton-amdgpu-to-llvm=gfx-arch=gfx942 --convert-builtin-func-to-llvm | FileCheck %s
+// RUN: triton-opt %s -split-input-file --convert-scf-to-cf --convert-triton-amdgpu-to-llvm="gfx-arch=gfx942 counter-padding=true" --convert-builtin-func-to-llvm | FileCheck %s
+// RUN: triton-opt %s -split-input-file --convert-scf-to-cf --convert-triton-amdgpu-to-llvm="gfx-arch=gfx950 counter-padding=true" --convert-builtin-func-to-llvm | FileCheck %s
+// RUN: triton-opt %s -split-input-file --convert-scf-to-cf --convert-triton-amdgpu-to-llvm=gfx-arch=gfx950 --convert-builtin-func-to-llvm | FileCheck %s --check-prefix=NOPAD
+// Counter padding hints are opt-in.
+// NOPAD-NOT: rocdl.balance_waits
 
 #blocked0 = #ttg.blocked<{sizePerThread = [8], threadsPerWarp = [32], warpsPerCTA = [1], order = [0]}>
 module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32} {
@@ -24,6 +28,56 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32} {
     %12 = tt.splat %arg2 : !tt.ptr<f32> -> tensor<256x!tt.ptr<f32>, #blocked0>
     %13 = tt.addptr %12, %4 : tensor<256x!tt.ptr<f32>, #blocked0>, tensor<256xi32, #blocked0>
     tt.store %13, %11 : tensor<256x!tt.ptr<f32>, #blocked0>
+    tt.return
+  }
+}
+
+// -----
+
+#blocked = #ttg.blocked<{sizePerThread = [1], threadsPerWarp = [64], warpsPerCTA = [1], order = [0]}>
+module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, "ttg.threads-per-warp" = 64 : i32} {
+  // CHECK-LABEL: @masked_load_counter_padding
+  tt.func @masked_load_counter_padding(%ptrs: tensor<64x!tt.ptr<f32>, #blocked>, %mask: tensor<64xi1, #blocked>, %out: tensor<64x!tt.ptr<f32>, #blocked>) {
+    %other = arith.constant dense<0.0> : tensor<64xf32, #blocked>
+    // The load in the branch is annotated, so the backend pads the other edge.
+    // CHECK: llvm.cond_br {{.*}}, ^[[LOAD:bb[0-9]+]], ^[[JOIN:bb[0-9]+]]
+    // CHECK: ^[[LOAD]]:
+    // CHECK: llvm.load {{.*}}{rocdl.balance_waits}
+    // CHECK-NEXT: llvm.br ^[[JOIN]]
+    %value = tt.load %ptrs, %mask, %other : tensor<64x!tt.ptr<f32>, #blocked>
+    tt.store %out, %value : tensor<64x!tt.ptr<f32>, #blocked>
+    tt.return
+  }
+}
+
+// -----
+
+#blocked = #ttg.blocked<{sizePerThread = [1], threadsPerWarp = [64], warpsPerCTA = [1], order = [0]}>
+module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, "ttg.threads-per-warp" = 64 : i32} {
+  // CHECK-LABEL: @unmasked_load_without_counter_padding
+  tt.func @unmasked_load_without_counter_padding(%ptrs: tensor<64x!tt.ptr<f32>, #blocked>, %out: tensor<64x!tt.ptr<f32>, #blocked>) {
+    // CHECK: llvm.load
+    // CHECK-NOT: rocdl.balance_waits
+    // CHECK: llvm.return
+    %value = tt.load %ptrs : tensor<64x!tt.ptr<f32>, #blocked>
+    tt.store %out, %value : tensor<64x!tt.ptr<f32>, #blocked>
+    tt.return
+  }
+}
+
+// -----
+
+#blocked = #ttg.blocked<{sizePerThread = [1], threadsPerWarp = [64], warpsPerCTA = [1], order = [0]}>
+module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, "ttg.threads-per-warp" = 64 : i32} {
+  // CHECK-LABEL: @constant_masked_load_without_counter_padding
+  tt.func @constant_masked_load_without_counter_padding(%ptrs: tensor<64x!tt.ptr<f32, "constant">, #blocked>, %mask: tensor<64xi1, #blocked>, %out: tensor<64x!tt.ptr<f32>, #blocked>) {
+    %other = arith.constant dense<0.0> : tensor<64xf32, #blocked>
+    // Constant-address-space loads can use a different counter.
+    // CHECK: llvm.load %{{[0-9]+}} : !llvm.ptr<4>
+    // CHECK-NOT: rocdl.balance_waits
+    // CHECK: llvm.return
+    %value = tt.load %ptrs, %mask, %other : tensor<64x!tt.ptr<f32, "constant">, #blocked>
+    tt.store %out, %value : tensor<64x!tt.ptr<f32>, #blocked>
     tt.return
   }
 }

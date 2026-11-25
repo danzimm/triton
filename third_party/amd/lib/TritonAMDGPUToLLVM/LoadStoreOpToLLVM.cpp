@@ -798,6 +798,8 @@ struct BufferLoadToLocalOpConversion
 
     RankedTensorType ptrType =
         cast<RankedTensorType>(getPointerTypeWithShape(ptr, offset));
+    bool padMaskedLoad =
+        op.getMask() && op.getOther() && !isZeroFillConst(op.getOther());
 
     // We can load N elements at a time if:
     //  1. Every group of N source pointers are contiguous.  For example, if
@@ -913,6 +915,8 @@ struct BufferLoadToLocalOpConversion
         if (targetInfo.requiresAliasInfoForAsyncOps())
           AMD::addAsyncCopyAliasScope(bufferLoadToLds);
 
+        if (padMaskedLoad && targetInfo.emitCounterPadding())
+          LLVM::AMD::addBalanceWaitsAttr(bufferLoadToLds);
         rewriter.setInsertionPointToStart(afterLoadBlock);
 
         if (hasOther) {
@@ -1066,9 +1070,12 @@ struct AsyncCopyGlobalToLocalOpConversion
         // emit a branch.
         auto [loadBlock, afterLoadBlock] = emitBranch(rewriter, loc, cond);
 
-        emitAsyncLoad(rewriter, loc, targetInfo, vecBits, srcElem, shmemAddr,
-                      *cacheModifier, multicastMask);
+        Operation *asyncLoad =
+            emitAsyncLoad(rewriter, loc, targetInfo, vecBits, srcElem,
+                          shmemAddr, *cacheModifier, multicastMask);
 
+        if (asyncLoad && hasMask && targetInfo.emitCounterPadding())
+          LLVM::AMD::addBalanceWaitsAttr(asyncLoad);
         rewriter.setInsertionPointToStart(afterLoadBlock);
       }
 
@@ -1096,10 +1103,11 @@ struct AsyncCopyGlobalToLocalOpConversion
     return success();
   }
 
-  void emitAsyncLoad(RewriterBase &rewriter, Location loc,
-                     AMD::TargetInfo targetInfo, int vecBits, Value srcPtr,
-                     Value shmemAddr, triton::CacheModifier cacheMod,
-                     Value multicastMask) const {
+  Operation *emitAsyncLoad(RewriterBase &rewriter, Location loc,
+                           AMD::TargetInfo targetInfo, int vecBits,
+                           Value srcPtr, Value shmemAddr,
+                           triton::CacheModifier cacheMod,
+                           Value multicastMask) const {
     auto b = TritonLLVMOpBuilder(loc, rewriter);
     int32_t cacheModifiers =
         mlir::LLVM::AMD::getCtrlBitsForCacheModifierOnTarget(
@@ -1113,42 +1121,46 @@ struct AsyncCopyGlobalToLocalOpConversion
           nullptr, nullptr, nullptr);
       if (targetInfo.requiresAliasInfoForAsyncOps())
         AMD::addAsyncCopyAliasScope(asyncLoadOp);
-    } else if (targetInfo.getISAFamily() == ISAFamily::CDNA5) {
+      return asyncLoadOp;
+    }
+    Operation *asyncLoad = nullptr;
+    if (targetInfo.getISAFamily() == ISAFamily::CDNA5) {
       switch (vecBits) {
       case 32:
         if (multicastMask)
-          ROCDL::ClusterLoadAsyncToLDSB32Op::create(
+          asyncLoad = ROCDL::ClusterLoadAsyncToLDSB32Op::create(
               rewriter, loc, srcPtr, shmemAddr, 0u, auxAttr, multicastMask,
               nullptr, nullptr, nullptr);
         else
-          ROCDL::GlobalLoadAsyncToLDSB32Op::create(rewriter, loc, srcPtr,
-                                                   shmemAddr, 0u, auxAttr,
-                                                   nullptr, nullptr, nullptr);
+          asyncLoad = ROCDL::GlobalLoadAsyncToLDSB32Op::create(
+              rewriter, loc, srcPtr, shmemAddr, 0u, auxAttr, nullptr, nullptr,
+              nullptr);
         break;
       case 64:
         if (multicastMask)
-          ROCDL::ClusterLoadAsyncToLDSB64Op::create(
+          asyncLoad = ROCDL::ClusterLoadAsyncToLDSB64Op::create(
               rewriter, loc, srcPtr, shmemAddr, 0u, auxAttr, multicastMask,
               nullptr, nullptr, nullptr);
         else
-          ROCDL::GlobalLoadAsyncToLDSB64Op::create(rewriter, loc, srcPtr,
-                                                   shmemAddr, 0u, auxAttr,
-                                                   nullptr, nullptr, nullptr);
+          asyncLoad = ROCDL::GlobalLoadAsyncToLDSB64Op::create(
+              rewriter, loc, srcPtr, shmemAddr, 0u, auxAttr, nullptr, nullptr,
+              nullptr);
         break;
       case 128:
         if (multicastMask)
-          ROCDL::ClusterLoadAsyncToLDSB128Op::create(
+          asyncLoad = ROCDL::ClusterLoadAsyncToLDSB128Op::create(
               rewriter, loc, srcPtr, shmemAddr, 0u, auxAttr, multicastMask,
               nullptr, nullptr, nullptr);
         else
-          ROCDL::GlobalLoadAsyncToLDSB128Op::create(rewriter, loc, srcPtr,
-                                                    shmemAddr, 0u, auxAttr,
-                                                    nullptr, nullptr, nullptr);
+          asyncLoad = ROCDL::GlobalLoadAsyncToLDSB128Op::create(
+              rewriter, loc, srcPtr, shmemAddr, 0u, auxAttr, nullptr, nullptr,
+              nullptr);
         break;
       default:
         llvm_unreachable("Unsupported vec size for async load");
       }
     }
+    return asyncLoad;
   }
 };
 

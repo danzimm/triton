@@ -105,6 +105,12 @@ public:
     //              | 0/1       | 1       | (cg) global load nt
     //              | 1         | 0       | (cv) flat load sc0 sc1
     auto loadResult = createLoadWithAttrs(loc);
+    auto addressSpace =
+        cast<LLVM::LLVMPointerType>(ptr.getType()).getAddressSpace();
+    if (targetInfo.emitCounterPadding() &&
+        (addressSpace == 0 || addressSpace == 1))
+      if (auto llLoad = loadResult.getDefiningOp<LLVM::LoadOp>())
+        LLVM::AMD::addBalanceWaitsAttr(llLoad);
     LLVM::BrOp::create(rewriter, loc, ValueRange{loadResult}, afterLoad);
 
     rewriter.replaceOp(loadOp, afterLoad->getArgument(0));
